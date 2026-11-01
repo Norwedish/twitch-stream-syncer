@@ -1,120 +1,158 @@
 # Stream Syncer
 
-Bekijk meerdere live streams op één pagina. De stream met de **hoogste latency**
-wordt de referentie; alle andere streams worden daarop gesynchroniseerd.
+Watch several live streams on one page, synced to the stream with the **highest
+latency**. The slowest stream becomes the reference; every other stream follows
+it, so nothing runs ahead of what you can actually see.
 
-```
+Supported sources: **Twitch** (as a plain HLS stream), **YouTube** and any
+**HLS (`.m3u8`) or MP4/WebM** URL.
+
+## Quick start
+
+```bash
 npm install
 npm run dev
 ```
 
-Open daarna <http://localhost:5173>. Start de app **altijd via `npm run dev`**:
-de dev-server bevat een kleine proxy die Twitch-playlists doorlaat (Twitch stuurt
-daar geen CORS-headers, dus de browser mag ze anders niet lezen). Bij een
-productiebuild moet je hosting hetzelfde doen. Klik op **Streams toevoegen** en plak
-Twitch-kanalen, YouTube-links of HLS-URL's (één per regel):
+Open <http://localhost:5173>, click **Add streams** and paste Twitch channels,
+YouTube links or HLS URLs (one per line):
 
 ```
 shroud
 https://twitch.tv/kaicenat
 https://www.youtube.com/watch?v=...
-https://voorbeeld.nl/live/master.m3u8
+https://example.com/live/master.m3u8
 ```
 
-Je kunt ook direct linken:
-`http://localhost:5173/?add=https://twitch.tv/shroud&add=https://twitch.tv/kaicenat`
+You can also link straight to a setup:
 
-## Hoe de synchronisatie werkt
+```
+http://localhost:5173/?add=https://twitch.tv/shroud&add=https://twitch.tv/kaicenat
+```
 
-Elke stream krijgt een **positie** in een gedeelde tijdlijn. Een lage positie
-betekent dat de stream achterloopt: de kijker ziet dan een ouder stukje content.
+The UI is available in English, Dutch, German, French and Spanish. It follows
+your system language unless you pick one in the settings (stored in a cookie).
 
-1. **Latency meten.** Voor HLS-streams lezen we de media-playlist en gebruiken
-   we `EXT-X-PROGRAM-DATE-TIME` (of `EXT-X-TIMESTAMP-MAP`) om de wandkloktijd
-   van elk segment te kennen. De latency is het verschil tussen het einde van
-   het nieuwste segment en de plek waar de speler staat. Voor Twitch gebruikt
-   de player-API de gemeten latency naar de streamer (`hlsLatencyBroadcaster`).
-   YouTube geeft geen exacte latency; daar gebruiken we de relatieve drift.
-2. **Referentie kiezen.** De stream met de grootste latency is de traagste en
-   wordt de referentie. Sneller kan niet: je kunt een live stream niet vooruit
-   spoelen, dus alles moet wachten op de traagste. De referentie blijft staan
-   tot een andere stream minstens *Referentie wisselen vanaf* (standaard 3 s)
-   trager is en dat 5 seconden volhoudt. Met het vinkje **referentie** op een
-   kaart zet je zelf één stream vast als referentie (alle andere streams volgen
-   die dan); uitvinken geeft de keuze weer terug aan de automaat.
-3. **Corrigeren.** Er wordt nooit gepauzeerd. Snellere streams lopen rustig
-   langzamer (tot 0.85x) tot ze bij de referentie zijn; dat merk je nauwelijks
-   en het beeld blijft doorlopen. Is het verschil groter dan *Maximale
-   afwijking*, dan wordt de stream één keer opnieuw gestart op de
-   referentiepositie (sneller dan 0.85x afspelen klinkt als een kapotte plaat).
-   Streams zonder exacte meting (Twitch- en YouTube-embeds) volgen de
-   referentie via hun eigen drift; bij te veel drift wordt de embed opnieuw
-   geladen.
-4. **Handmatig bijsturen.** Met `−` en `+` op een kaart stel je per stream een
-   offset in (0,5 s per klik). Positief = later afspelen. Met het **tv-icoontje**
-   bovenaan een kaart open je de streampagina (twitch.tv/kanaal of de
-   YouTube-video) in een nieuw tabblad.
+## How the sync works
 
-## Wat is (niet) mogelijk
+Every stream gets a **position** on a shared timeline. A low position means the
+stream is behind: the viewer sees an older moment of the broadcast.
 
-| Bron | Latency meten | Bijsturen |
+1. **Measure latency.** For HLS streams we read the media playlist and use
+   `EXT-X-PROGRAM-DATE-TIME` (or `EXT-X-TIMESTAMP-MAP`) to know the wall-clock
+   time of every segment. Latency is the difference between the end of the
+   newest segment and where the player is. Twitch's embed reports
+   `hlsLatencyBroadcaster`; YouTube only gives us relative drift.
+2. **Pick a reference.** The stream with the highest latency is the slowest and
+   becomes the reference. You cannot speed a live stream up, so everything has
+   to wait for the slowest one. The reference is *sticky*: it only switches when
+   another stream is at least *Switch reference from* seconds slower (default 3)
+   and stays that way for 5 seconds. The **reference** checkbox on a card pins
+   one stream manually; unticking hands the choice back to the automatic mode.
+3. **Correct.** Nothing is ever paused. Faster streams play slightly slower
+   (down to 0.85x) until they match the reference, which is barely noticeable
+   and keeps the picture running. If the gap exceeds *Maximum difference*, the
+   stream is restarted once at the reference position (playing slower than 0.85x
+   sounds like a broken record). Streams without an exact measurement (Twitch
+   and YouTube embeds) follow the reference through their own drift.
+4. **Fine-tune by hand.** Use `−` and `+` on a card for a per-stream offset
+   (0.5 s per click, positive = play later). The **TV icon** on a card opens the
+   stream page (twitch.tv/channel or the YouTube video) in a new tab.
+
+## What is (not) possible
+
+| Source | Latency measurement | Correction |
 | --- | --- | --- |
-| HLS (`.m3u8`) | exact, via de playlist | seek + playbackRate |
-| MP4/WebM | exact (positie in het bestand) | seek + playbackRate |
-| Twitch via HLS | exact, via de Twitch-playlist | seek + playbackRate |
-| Twitch embed | via `hlsLatencyBroadcaster` | playbackRate, wachten of herladen |
-| YouTube | alleen drift (geen exacte latency) | playbackRate, wachten of herladen |
+| HLS (`.m3u8`) | exact, from the playlist | seek + playbackRate |
+| MP4/WebM | exact (position in the file) | seek + playbackRate |
+| Twitch via HLS | exact, from the Twitch playlist | seek + playbackRate |
+| Twitch embed | via `hlsLatencyBroadcaster` | playbackRate, wait or reload |
+| YouTube | drift only (no exact latency) | playbackRate, wait or reload |
 
 ### Twitch via HLS
 
-Twitch levert zijn streams als HLS aan de eigen webplayer. De app haalt die
-playlist op via `gql.twitch.tv` (PlaybackAccessToken) en `usher.ttvnw.net`, en
-speelt hem met hls.js in een gewone `<video>`. De playlist bevat
-`EXT-X-PROGRAM-DATE-TIME`, dus latency is exact meetbaar en de stream is echt
-te seeken. Dit is standaard aan (`Instellingen → Twitch via HLS`).
+Twitch delivers its streams as HLS to its own web player. The app fetches that
+playlist through `gql.twitch.tv` (`PlaybackAccessToken`) and
+`usher.ttvnw.net`, then plays it with hls.js in a regular `<video>`. The playlist
+contains `EXT-X-PROGRAM-DATE-TIME`, so latency is measured exactly and the stream
+can really be seeked. This is on by default (*Settings → Twitch via HLS*).
 
-Omdat `usher.ttvnw.net` en de Twitch-CDN geen CORS-headers sturen, lopen deze
-verzoeken in de dev-server via `/twitch-hls/...` (zie `vite.config.ts`). Zonder
-die proxy krijg je de melding "Twitch blokkeert directe toegang tot de playlist".
+`usher.ttvnw.net` and the Twitch CDN send no CORS headers, so these requests go
+through `/twitch-hls/...`: the dev server proxies them in development, the
+Cloudflare Worker does it in production. Without that proxy you get
+"Twitch blocks direct access to the playlist (CORS)".
 
-Het is dezelfde onofficiële route die Streamlink gebruikt: Twitch kan hem op elk
-moment wijzigen of blokkeren (dan krijg je "Twitch weigert de playlist"). Zet de
-instelling dan uit om de officiële embed te gebruiken. Twitch-embeds zijn
-iframes van een andere partij: die kun je niet seeken en hun exacte latency is
-niet van buitenaf te meten, dus die streams zijn alleen *relatief* te
-synchroniseren.
+It is the same unofficial route Streamlink uses: Twitch can change or block it
+at any time. Turn the setting off to use the official embed. Embeds are
+third-party iframes: they cannot be seeked and their exact latency is not
+observable, so those streams can only be synced *relatively*.
 
-## Instellingen
+## Settings
 
-- **Taal** – Nederlands, Engels, Duits, Frans of Spaans. Standaard de taal van
-  je systeem (`navigator.languages`); kies je zelf een taal, dan wordt die in
-  de cookie `stream-syncer-lang` bewaard. "Automatisch" verwijdert die cookie
-  weer en volgt opnieuw het systeem.
-- **Automatische sync** – aan/uit voor de correcties.
-- **Twitch via HLS** – Twitch-kanalen via de HLS-playlist spelen (exact meetbaar en seekbaar) in plaats van de embed.
-- **Volume van de actieve stream** – alleen de stream waarvan je op het
-  luidspreker-icoon klikt is hoorbaar; de rest staat gedempt.
-- **Veiligheidsmarge** – extra seconden dat de referentie voorloopt.
-- **Maximale afwijking** – groter verschil = herstarten in plaats van vertragen.
+- **Language** – English, Dutch, German, French or Spanish. Defaults to your
+  system language (`navigator.languages`); your choice is stored in the
+  `stream-syncer-lang` cookie. *Automatic* removes the cookie again.
+- **Automatic sync** – turn the corrections on or off.
+- **Twitch via HLS** – play Twitch channels through the HLS playlist (exact and
+  seekable) instead of the embed.
+- **Volume of the active stream** – only the stream whose speaker icon you click
+  is audible; the others are muted.
+- **Safety margin** – extra seconds the reference runs ahead.
+- **Maximum difference** – a larger gap means restart instead of slow down.
+- **Switch reference from** – how much slower another stream must be before the
+  reference changes (0 = always the slowest stream).
 
-## Ontwikkelen
+## Hosting
 
+### Cloudflare Workers (recommended)
+
+The app needs a tiny server-side proxy for Twitch (no CORS headers), so a plain
+static host is not enough. `worker/index.ts` serves the build from `dist/` and
+proxies `/twitch-hls/...`.
+
+```bash
+npx wrangler login     # once
+npm run deploy         # build + deploy to https://twitch-stream-syncer.<account>.workers.dev
 ```
-npm run dev        # dev-server op http://localhost:5173
-npm test           # unit tests voor de sync-engine en de HLS-parser
-npm run build      # productiebuild in dist/
+
+On every push to `master`, `.github/workflows/deploy.yml` runs the tests, builds
+and deploys. Add the repository secrets `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` to enable that.
+
+### GitHub Pages (Twitch embed only)
+
+GitHub Pages can host the static build, but it cannot run the proxy. Twitch
+streams then play through the official embed (no exact latency, no seeking):
+
+```bash
+VITE_TWITCH_PROXY=off npm run build
 ```
 
-Bronstructuur:
+Publish `dist/` with your favourite Pages action (for example
+`actions/upload-pages-artifact` + `actions/deploy-pages`). HLS and MP4 streams
+work normally, as long as their server sends CORS headers.
 
-- `src/sources.ts` – URL's herkennen (Twitch, YouTube, HLS, video).
-- `src/twitch-hls.ts` – Twitch-playlist ophalen (GQL + usher) en kwaliteit kiezen.
-- `src/hls-timeline.ts` – playlist parsen, latency berekenen.
-- `src/adapters.ts` – één interface voor HLS/video, Twitch en YouTube.
-- `src/sync.ts` – de sync-engine: referentie kiezen, correcties berekenen.
-- `src/engine.ts` – kaarten, audio, herstarten en de tick-loop.
-- `src/main.ts` – UI, opslag en instellingen.
+## Development
 
-Let op: de Twitch-player werkt alleen op `localhost` of een eigen domein
-(de player gebruikt de hostnaam van de pagina als `parent`). Een `file://`-pagina
-werkt niet; gebruik de dev-server of een build via een statische server.
+```bash
+npm run dev        # dev server on http://localhost:5173
+npm test           # sync engine, HLS parser and translation tests
+npm run build      # production build in dist/
+npm run deploy     # build + deploy to Cloudflare Workers
+```
+
+Source layout:
+
+- `src/sources.ts` – recognise URLs (Twitch, YouTube, HLS, video).
+- `src/twitch-hls.ts` – fetch the Twitch playlist (GQL + usher), pick a quality.
+- `src/hls-timeline.ts` – parse playlists, compute latency.
+- `src/adapters.ts` – one interface for HLS/video, Twitch and YouTube.
+- `src/sync.ts` – the sync engine: pick the reference, compute corrections.
+- `src/engine.ts` – cards, audio, restarts and the tick loop.
+- `src/i18n.ts` – languages, cookie and all translations.
+- `src/main.ts` – UI, storage and settings.
+- `worker/index.ts` – Cloudflare Worker (static files + Twitch proxy).
+
+Note: the Twitch player only works on `localhost` or your own domain (it uses
+the page hostname as its `parent`). A `file://` page will not work; use the dev
+server or a build behind a server.

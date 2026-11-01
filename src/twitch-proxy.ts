@@ -1,13 +1,18 @@
 /**
  * URL's omzetten zodat de browser ze kan laden.
  *
- * Twitch levert zijn playlists en segmenten zonder CORS-headers. In de
- * dev-server lopen die URL's daarom via de proxy (`/twitch-hls/...`); in een
- * productiebuild moet de hosting hetzelfde doen, of de proxy uit staan.
+ * Twitch levert zijn playlists en segmenten zonder CORS-headers. Ze lopen
+ * daarom via de proxy (`/twitch-hls/...`): in de dev-server regelt
+ * `vite.config.ts` die, in productie `worker/index.ts` (Cloudflare Workers).
+ * Een statische host zonder proxy (zoals GitHub Pages) kan de Twitch-playlist
+ * niet lezen; daar valt de app terug op de officiële Twitch-embed.
  */
 
-/** Is de dev-proxy beschikbaar? (alleen bij `npm run dev`) */
-export const HAS_TWITCH_PROXY = Boolean(import.meta.env?.DEV);
+/**
+ * Is er een proxy beschikbaar? Altijd, behalve in een pure statische build
+ * (zet `VITE_TWITCH_PROXY=off` als je op GitHub Pages host).
+ */
+export const HAS_TWITCH_PROXY = import.meta.env?.VITE_TWITCH_PROXY !== 'off';
 
 const TWITCH_CDN = /^https:\/\/[^/]*(ttvnw\.net|twitch\.tv)\//;
 

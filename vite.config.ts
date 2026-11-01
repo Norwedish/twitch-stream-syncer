@@ -1,23 +1,23 @@
 import { defineConfig, type Plugin } from 'vite';
 
 /**
- * Twitch levert zijn HLS-playlists zonder CORS-headers. De browser mag ze dus
- * niet lezen, en zonder playlist kunnen we de latency niet meten en de stream
- * niet in een <video> spelen. Deze dev-proxy haalt de playlist (en de
- * segmenten) server-side op en zet er CORS-headers op.
+ * Twitch serves its HLS playlists without CORS headers, so the browser may not
+ * read them. Without the playlist we cannot measure latency or play the stream
+ * in a <video>. This dev proxy fetches the playlist (and the segments)
+ * server-side and adds CORS headers.
  *
- * Alleen voor `npm run dev`; een productiebuild heeft een eigen proxy nodig.
+ * In production `worker/index.ts` does the same (Cloudflare Workers).
  */
 function twitchProxy(): Plugin {
   return {
     name: 'twitch-hls-proxy',
     configureServer(server) {
       server.middlewares.use('/twitch-hls', async (req, res) => {
-        // Vite haalt de mount-prefix uit req.url; het pad begint dus met "/".
+        // Vite strips the mount prefix from req.url, so the path starts with "/".
         const rawUrl = req.url ?? '';
         let target = rawUrl.replace(/^\/+/, '');
-        // Vite voegt "//" samen ("https:/host"). Herstel herhaald, want er kan
-        // ook een extra "https:/" in terechtkomen.
+        // Vite collapses "//" in URLs ("https:/host"); restore it, repeatedly,
+        // because an extra "https:/" can sneak in.
         for (let i = 0; i < 3; i++) {
           target = target.replace(/^https:\/(?!\/)/, 'https://').replace(/^http:\/(?!\/)/, 'http://');
           target = target.replace(/^https:\/\/https:\/\//, 'https://').replace(/^https:\/\/https:\//, 'https://');
@@ -26,12 +26,14 @@ function twitchProxy(): Plugin {
         if (!target.startsWith('http')) target = `https://${target}`;
         if (!/^https:\/\/[^/]*(ttvnw\.net|twitch\.tv)\//.test(target)) {
           res.statusCode = 400;
-          res.end(`Alleen Twitch-URLs zijn toegestaan. (${target.slice(0, 120)})`);
+          res.end(`Only Twitch URLs are allowed. (${target.slice(0, 120)})`);
           return;
         }
-        try {          const upstream = await fetch(target, {
+        try {
+          const upstream = await fetch(target, {
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
               Accept: '*/*',
               Origin: 'https://www.twitch.tv',
               Referer: 'https://www.twitch.tv/',
@@ -44,7 +46,7 @@ function twitchProxy(): Plugin {
           res.end(Buffer.from(await upstream.arrayBuffer()));
         } catch (error) {
           res.statusCode = 502;
-          res.end(`Proxy-fout: ${error instanceof Error ? error.message : String(error)}`);
+          res.end(`Proxy error: ${error instanceof Error ? error.message : String(error)}`);
         }
       });
     },
@@ -55,8 +57,8 @@ export default defineConfig({
   plugins: [twitchProxy()],
   server: {
     port: 5173,
-    // Zet dit op true als je de dev-server op een andere machine dan de browser draait.
-    // Niet nodig voor Twitch: de player gebruikt de hostname van de pagina als parent.
+    // Set this to true when the dev server runs on a different machine than the browser.
+    // Not needed for Twitch: the player uses the page hostname as its parent.
     host: true,
   },
   build: {
