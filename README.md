@@ -104,11 +104,38 @@ observable, so those streams can only be synced *relatively*.
 
 ## Hosting
 
-### Cloudflare Workers (recommended)
-
 The app needs a tiny server-side proxy for Twitch (no CORS headers), so a plain
-static host is not enough. `worker/index.ts` serves the build from `dist/` and
-proxies `/twitch-hls/...`.
+static host is not enough. Pick one of these:
+
+### Self-hosted (Node)
+
+```bash
+npm install
+npm run build
+npm start              # http://localhost:8080
+```
+
+`server/index.mjs` serves `dist/` and proxies `/twitch-hls/...`. No extra
+dependencies (Node 20+). Environment variables:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PORT` | `8080` | port to listen on |
+| `HOST` | `0.0.0.0` | interface to bind |
+| `ALLOWED_HOSTS` | empty (all) | comma-separated hostnames allowed to use the proxy, e.g. `streams.example.com` |
+
+Put it behind a reverse proxy (Caddy, nginx) with HTTPS if it is public.
+
+### Docker
+
+```bash
+docker build -t stream-syncer .
+docker run -p 8080:8080 stream-syncer
+```
+
+### Cloudflare Workers (free tier)
+
+`worker/index.ts` serves the build from `dist/` and proxies `/twitch-hls/...`.
 
 ```bash
 npx wrangler login     # once
@@ -138,6 +165,7 @@ work normally, as long as their server sends CORS headers.
 npm run dev        # dev server on http://localhost:5173
 npm test           # sync engine, HLS parser and translation tests
 npm run build      # production build in dist/
+npm start          # serve dist/ + Twitch proxy on http://localhost:8080
 npm run deploy     # build + deploy to Cloudflare Workers
 ```
 
@@ -151,6 +179,7 @@ Source layout:
 - `src/engine.ts` – cards, audio, restarts and the tick loop.
 - `src/i18n.ts` – languages, cookie and all translations.
 - `src/main.ts` – UI, storage and settings.
+- `server/index.mjs` – self-hosted server (static files + Twitch proxy).
 - `worker/index.ts` – Cloudflare Worker (static files + Twitch proxy).
 
 Note: the Twitch player only works on `localhost` or your own domain (it uses
