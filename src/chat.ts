@@ -83,7 +83,10 @@ export class ChatPanel {
         button.type = 'button';
         button.className = 'chat-tab';
         button.dataset.id = tab.id;
+        button.setAttribute('role', 'tab');
         button.addEventListener('click', () => this.activate(tab.id));
+        // Pijltjestoetsen wisselen van tab (zoals een echte tablist).
+        button.addEventListener('keydown', (event) => this.onTabKey(event, tab.id));
         this.tabButtons.set(tab.id, button);
       }
       button.textContent = tab.label || tab.channel;
@@ -95,6 +98,22 @@ export class ChatPanel {
       this.activeId = tabs[0]?.id ?? null;
     }
     this.render();
+  }
+
+  /** Toetsenbordnavigatie tussen de tabs (← → Home End). */
+  private onTabKey(event: KeyboardEvent, id: string): void {
+    const order = this.tabs.map((t) => t.id);
+    const index = order.indexOf(id);
+    if (index === -1) return;
+    let next = index;
+    if (event.key === 'ArrowRight') next = (index + 1) % order.length;
+    else if (event.key === 'ArrowLeft') next = (index - 1 + order.length) % order.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = order.length - 1;
+    else return;
+    event.preventDefault();
+    this.activate(order[next]);
+    this.tabButtons.get(order[next])?.focus();
   }
 
   /** Wisselt van tab (bv. bij focus op een stream). */
@@ -126,6 +145,8 @@ export class ChatPanel {
     for (const [id, button] of this.tabButtons) {
       button.classList.toggle('is-active', id === this.activeId);
       button.setAttribute('aria-selected', String(id === this.activeId));
+      button.tabIndex = id === this.activeId ? 0 : -1;
+      button.setAttribute('aria-controls', `chat-panel-${id}`);
     }
 
     const active = this.tabs.find((t) => t.id === this.activeId);
@@ -134,7 +155,7 @@ export class ChatPanel {
     // Embed pas aanmaken als de tab voor het eerst zichtbaar wordt.
     let frame = this.frames.get(active.id);
     if (!frame) {
-      frame = this.createFrame(active.channel);
+      frame = this.createFrame(active.channel, active.id);
       this.frames.set(active.id, frame);
       body.appendChild(frame);
       this.applyDarkTheme(frame);
@@ -142,7 +163,7 @@ export class ChatPanel {
     for (const [id, f] of this.frames) f.hidden = id !== active.id;
   }
 
-  private createFrame(channel: string): HTMLIFrameElement {
+  private createFrame(channel: string, id: string): HTMLIFrameElement {
     const frame = document.createElement('iframe');
     const host = window.location.hostname;
     // `darkpopout` laat Twitch het donkere thema gebruiken (zoals de Twitch-popout).
@@ -150,18 +171,21 @@ export class ChatPanel {
     frame.src = `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?${params}`;
     frame.className = 'chat-frame';
     frame.title = `Twitch chat: ${channel}`;
+    frame.id = `chat-panel-${id}`;
+    frame.setAttribute('role', 'tabpanel');
     frame.setAttribute('allow', 'clipboard-write');
     frame.setAttribute('scrolling', 'no');
     return frame;
   }
+
   /**
    * Probeert het donkere thema in de Twitch-embed te zetten. Twitch gebruikt de
    * klassen `tw-root--theme-light` / `tw-root--theme-dark` op het <html>-element.
    *
    * De embed is een iframe van twitch.tv: dat mag alleen als de pagina op
    * twitch.tv draait. Op je eigen domein blokkeert de browser dit, en dan
-   * bepaalt de Twitch-site-instelling van de kijker het thema. We proberen het
-   * wel, zodat het werkt zodra dat wél kan.
+   * bepaalt de Twitch-embed zelf het thema (`darkpopout`). We proberen het wel,
+   * zodat het werkt zodra dat wél kan.
    */
   private applyDarkTheme(frame: HTMLIFrameElement): void {
     let attempts = 0;

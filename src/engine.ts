@@ -211,11 +211,11 @@ export class SyncEngine {
           <span class="badge badge-state" hidden></span>
         </div>
         <div class="card-actions">
-          <button type="button" class="icon-btn" data-action="open-page"></button>
-          <button type="button" class="icon-btn" data-action="focus" title="${this.escapeAttr(t.focus)}">${ICON_FOCUS}</button>
-          <button type="button" class="icon-btn" data-action="remove" title="${this.escapeAttr(t.remove)}">${ICON_TRASH}</button>
+          <button type="button" class="icon-btn" data-action="open-page" aria-label=""></button>
+          <button type="button" class="icon-btn" data-action="focus" title="${this.escapeAttr(t.focus)}" aria-label="${this.escapeAttr(t.focus)}">${ICON_FOCUS}</button>
+          <button type="button" class="icon-btn" data-action="remove" title="${this.escapeAttr(t.remove)}" aria-label="${this.escapeAttr(t.remove)}">${ICON_TRASH}</button>
         </div>
-        <div class="card-error" hidden></div>
+        <div class="card-error" role="alert" hidden></div>
       `,
     );
 
@@ -224,7 +224,7 @@ export class SyncEngine {
       `
       <footer class="card-footer">
         <div class="card-title">
-          <span class="kind-icon"></span>
+          <span class="kind-icon" aria-hidden="true"></span>
           <span class="title-text"></span>
         </div>
         <div class="card-stats">
@@ -233,16 +233,16 @@ export class SyncEngine {
           <div class="stat"><span class="stat-label">${t.statRate}</span><span class="stat-value" data-stat="rate">1.00x</span></div>
         </div>
         <div class="card-controls">
-          <button type="button" class="icon-btn" data-action="playpause" title="${this.escapeAttr(t.playPause)}"></button>
-          <button type="button" class="icon-btn" data-action="mute" title="${this.escapeAttr(t.mute)}"></button>
+          <button type="button" class="icon-btn" data-action="playpause" title="${this.escapeAttr(t.playPause)}" aria-label="${this.escapeAttr(t.playPause)}"></button>
+          <button type="button" class="icon-btn" data-action="mute" title="${this.escapeAttr(t.mute)}" aria-label="${this.escapeAttr(t.mute)}"></button>
           <label class="anchor-toggle" title="${this.escapeAttr(t.anchorToggleHint)}">
             <input type="checkbox" data-action="force-anchor" />
             <span>${t.anchorToggle}</span>
           </label>
-          <div class="offset-control" title="${this.escapeAttr(t.offsetTitle)}">
-            <button type="button" class="icon-btn tiny" data-action="offset-down" title="${this.escapeAttr(t.offsetEarlier)}">−</button>
-            <span class="offset-value">0.0s</span>
-            <button type="button" class="icon-btn tiny" data-action="offset-up" title="${this.escapeAttr(t.offsetLater)}">+</button>
+          <div class="offset-control" role="group" aria-label="${this.escapeAttr(t.offsetTitle)}" title="${this.escapeAttr(t.offsetTitle)}">
+            <button type="button" class="icon-btn tiny" data-action="offset-down" title="${this.escapeAttr(t.offsetEarlier)}" aria-label="${this.escapeAttr(t.offsetEarlier)}">−</button>
+            <span class="offset-value" aria-live="off">0.0s</span>
+            <button type="button" class="icon-btn tiny" data-action="offset-up" title="${this.escapeAttr(t.offsetLater)}" aria-label="${this.escapeAttr(t.offsetLater)}">+</button>
           </div>
         </div>
       </footer>
@@ -689,7 +689,11 @@ export class SyncEngine {
       rateEl.dataset.tone = member && Math.abs(member.rate - 1) > 0.005 ? 'warn' : 'good';
     }
 
-    if (playBtn) playBtn.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    if (playBtn) {
+      playBtn.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+      playBtn.setAttribute('aria-label', t.playPause);
+      playBtn.setAttribute('aria-pressed', String(playing));
+    }
     // Het tv-icoontje opent de streampagina; bij HLS staat er geen pagina,
     // dan is het gewoon de stream-URL.
     const pageBtn = card.querySelector<HTMLElement>('[data-action="open-page"]');
@@ -697,18 +701,23 @@ export class SyncEngine {
       pageBtn.innerHTML = ICON_TV;
       const url = streamPageUrl(v.config);
       pageBtn.hidden = !url;
-      pageBtn.title =
+      const label =
         v.config.kind === 'twitch' || v.config.kind === 'twitch-hls'
           ? t.openTwitch(v.config.ref)
           : v.config.kind === 'youtube'
             ? t.openYouTube
             : t.openStreamUrl;
+      pageBtn.title = label;
+      pageBtn.setAttribute('aria-label', label);
     }
     const isMaster = this.masterId === v.config.id;
     if (muteBtn) {
-      muteBtn.innerHTML = isMaster && !v.config.muted ? ICON_VOLUME : ICON_MUTE;
-      muteBtn.classList.toggle('is-active', isMaster && !v.config.muted);
-      muteBtn.title = isMaster && !v.config.muted ? t.mute : t.unmute;
+      const audible = isMaster && !v.config.muted;
+      muteBtn.innerHTML = audible ? ICON_VOLUME : ICON_MUTE;
+      muteBtn.classList.toggle('is-active', audible);
+      muteBtn.title = audible ? t.mute : t.unmute;
+      muteBtn.setAttribute('aria-label', audible ? t.mute : t.unmute);
+      muteBtn.setAttribute('aria-pressed', String(audible));
     }
     if (offsetValue) {
       offsetValue.textContent = `${v.config.offset > 0 ? '+' : ''}${v.config.offset.toFixed(1)}s`;

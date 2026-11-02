@@ -105,19 +105,20 @@ const languageOptions = [
 ].join('');
 
 app.innerHTML = `
+  <a class="skip-link" href="#grid" data-i18n="skipToStreams"></a>
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="url(#g)"/><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a970ff"/><stop offset="1" stop-color="#5c16c5"/></linearGradient></defs><path d="M9 23V9l14 7z" fill="#fff"/></svg>
       </span>
       <div class="brand-text">
-        <strong>Stream Syncer</strong>
+        <strong translate="no">Stream Syncer</strong>
         <span data-i18n="tagline"></span>
       </div>
     </div>
 
-    <div class="sync-status" id="sync-status">
-      <span class="status-dot"></span>
+    <div class="sync-status" id="sync-status" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
       <div class="status-text">
         <span class="status-title"></span>
         <span class="status-sub"></span>
@@ -129,11 +130,11 @@ app.innerHTML = `
       <button type="button" class="btn" id="btn-pause"></button>
       <button type="button" class="btn" id="btn-resync"></button>
       <button type="button" class="btn btn-primary" id="btn-add"></button>
-      <button type="button" class="icon-btn" id="btn-settings">${ICON_SETTINGS}</button>
+      <button type="button" class="icon-btn" id="btn-settings" aria-label="">${ICON_SETTINGS}</button>
     </div>
   </header>
   <main class="workspace" id="workspace">
-    <section class="board" id="board">
+    <section class="board" id="board" aria-label="Streams">
       <div class="grid" id="grid"></div>
       <div class="empty-state" id="empty-state">
         <div class="empty-icon" aria-hidden="true">${ICON_GRID}</div>
@@ -143,25 +144,25 @@ app.innerHTML = `
       </div>
     </section>
 
-    <aside class="chat" id="chat" data-layout="sidebar">
+    <aside class="chat" id="chat" data-layout="sidebar" aria-label="Twitch chat">
       <div class="chat-tabs" role="tablist"></div>
       <div class="chat-body"></div>
       <div class="chat-empty"></div>
     </aside>
   </main>
 
-  <dialog class="modal" id="add-modal">
+  <dialog class="modal" id="add-modal" aria-labelledby="add-title">
     <form method="dialog" class="modal-body" id="add-form">
       <header class="modal-head">
-        <h2></h2>
+        <h2 id="add-title"></h2>
         <button type="button" class="icon-btn" data-close>${ICON_CLOSE}</button>
       </header>
       <label class="field">
         <span class="field-label"></span>
-        <textarea id="add-input" rows="6" spellcheck="false"></textarea>
-        <span class="field-hint"><span id="add-hint"></span><code>shroud</code><span id="add-hint-end"></span></span>
+        <textarea id="add-input" name="streams" rows="6" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="…"></textarea>
+        <span class="field-hint"><span id="add-hint"></span><code translate="no">shroud</code><span id="add-hint-end"></span></span>
       </label>
-      <p class="form-error" id="add-error" hidden></p>
+      <p class="form-error" id="add-error" role="alert" hidden></p>
       <footer class="modal-foot">
         <button type="button" class="btn" data-close data-i18n="cancel"></button>
         <button type="submit" class="btn btn-primary" data-i18n="add"></button>
@@ -169,10 +170,10 @@ app.innerHTML = `
     </form>
   </dialog>
 
-  <dialog class="modal" id="settings-modal">
+  <dialog class="modal" id="settings-modal" aria-labelledby="settings-title">
     <form method="dialog" class="modal-body" id="settings-form">
       <header class="modal-head">
-        <h2></h2>
+        <h2 id="settings-title"></h2>
         <button type="button" class="icon-btn" data-close>${ICON_CLOSE}</button>
       </header>
 
@@ -181,7 +182,7 @@ app.innerHTML = `
           <strong data-i18n="autoSync"></strong>
           <small data-i18n="autoSyncHint"></small>
         </span>
-        <input type="checkbox" id="set-autosync" />
+        <input type="checkbox" id="set-autosync" name="autosync" />
       </label>
 
       <label class="switch-row">
@@ -189,42 +190,42 @@ app.innerHTML = `
           <strong data-i18n="twitchHls"></strong>
           <small data-i18n="twitchHlsHint"></small>
         </span>
-        <input type="checkbox" id="set-twitch-hls" />
+        <input type="checkbox" id="set-twitch-hls" name="twitch-hls" />
       </label>
 
       <div class="field-row">
-        <span class="field-label" data-i18n="twitchLogin"></span>
-        <button type="button" class="btn" id="btn-twitch-login"></button>
-        <span class="field-hint" data-i18n="twitchLoginHint"></span>
+        <span class="field-label" id="twitch-account-label" data-i18n="twitchLogin"></span>
+        <button type="button" class="btn" id="btn-twitch-login" aria-describedby="twitch-account-hint"></button>
+        <span class="field-hint" id="twitch-account-hint" data-i18n="twitchLoginHint"></span>
       </div>
 
       <label class="field-row">
         <span class="field-label" data-i18n="volume"></span>
-        <input type="range" id="set-volume" min="0" max="1" step="0.01" />
+        <input type="range" id="set-volume" name="volume" min="0" max="1" step="0.01" />
         <output id="set-volume-out"></output>
       </label>
 
       <label class="field-row">
         <span class="field-label" data-i18n="safetyMargin"></span>
-        <input type="number" id="set-margin" min="0" max="30" step="0.5" />
+        <input type="number" id="set-margin" name="safety-margin" inputmode="decimal" min="0" max="30" step="0.5" />
         <span class="field-hint" data-i18n="safetyMarginHint"></span>
       </label>
 
       <label class="field-row">
         <span class="field-label" data-i18n="maxLag"></span>
-        <input type="number" id="set-maxlag" min="1" max="60" step="0.5" />
+        <input type="number" id="set-maxlag" name="max-lag" inputmode="decimal" min="1" max="60" step="0.5" />
         <span class="field-hint" data-i18n="maxLagHint"></span>
       </label>
 
       <label class="field-row">
         <span class="field-label" data-i18n="anchorMargin"></span>
-        <input type="number" id="set-anchor-margin" min="0" max="60" step="0.5" />
+        <input type="number" id="set-anchor-margin" name="anchor-margin" inputmode="decimal" min="0" max="60" step="0.5" />
         <span class="field-hint" data-i18n="anchorMarginHint"></span>
       </label>
 
       <label class="field-row">
         <span class="field-label" data-i18n="language"></span>
-        <select id="set-language">${languageOptions}</select>
+        <select id="set-language" name="language">${languageOptions}</select>
         <span class="field-hint" data-i18n="languageHint"></span>
       </label>
 
@@ -234,10 +235,10 @@ app.innerHTML = `
     </form>
   </dialog>
 
-  <dialog class="modal" id="login-modal">
+  <dialog class="modal" id="login-modal" aria-labelledby="login-title">
     <div class="modal-body login-body">
       <header class="modal-head">
-        <h2 data-i18n="loginTitle"></h2>
+        <h2 id="login-title" data-i18n="loginTitle"></h2>
         <button type="button" class="icon-btn" data-close>${ICON_CLOSE}</button>
       </header>
       <p class="login-intro" data-i18n="loginIntro"></p>
@@ -254,7 +255,7 @@ app.innerHTML = `
     </div>
   </dialog>
 
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 `;
 
 const grid = document.getElementById('grid') as HTMLElement;
@@ -454,6 +455,10 @@ function applyLanguage(): void {
   btnResync.title = t.resyncTitle;
   btnAdd.textContent = t.addStreams;
   btnSettings.title = t.settings;
+  btnSettings.setAttribute('aria-label', t.settings);
+  for (const closeBtn of document.querySelectorAll<HTMLElement>('[data-close]')) {
+    if (!closeBtn.textContent?.trim()) closeBtn.setAttribute('aria-label', t.close);
+  }
   emptyTitle.textContent = t.emptyTitle;
   emptyText.textContent = t.emptyText;
   emptyAdd.textContent = t.addStreams;
@@ -584,6 +589,7 @@ function addSources(text: string): void {
   if (sources.length === 0) {
     addError.hidden = false;
     addError.textContent = errors.length ? t.addNoValid(errors.slice(0, 3).join(', ')) : t.addEmpty;
+    addInput.focus();
     return;
   }
 
