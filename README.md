@@ -27,8 +27,17 @@ https://example.com/live/master.m3u8
 You can also link straight to a setup:
 
 ```
-http://localhost:5173/?add=https://twitch.tv/shroud&add=https://twitch.tv/kaicenat
+https://streamsyncer.norwelab.nl/addstreams?noanoella+altijdmelvin+ljoeb
 ```
+
+Separate channels with `+`, commas or spaces. This also works with URLs:
+
+```
+https://streamsyncer.norwelab.nl/addstreams?add=https://twitch.tv/shroud&add=https://www.youtube.com/watch?v=...
+```
+
+The `/addstreams` link adds the channels to the current setup (duplicates are
+skipped) and then cleans the address bar.
 
 The UI is available in English, Dutch, German, French and Spanish. It follows
 your system language unless you pick one in the settings (stored in a cookie).

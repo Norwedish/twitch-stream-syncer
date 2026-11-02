@@ -12,7 +12,7 @@ import {
   type Lang,
   type Messages,
 } from './i18n';
-import { parseSourceList } from './import';
+import { parseImportSearch, parseSourceList } from './import';
 import { parseSource, type StreamConfig } from './sources';
 import { DEFAULT_SETTINGS, loadState, newStreamId, saveState, type AppSettings } from './store';
 import type { SyncPlan } from './sync';
@@ -852,13 +852,19 @@ const resumeOnGesture = () => {
 window.addEventListener('pointerdown', resumeOnGesture);
 window.addEventListener('keydown', resumeOnGesture);
 
-// URL-import: ?add=<url>&add=<url>
-const params = new URLSearchParams(window.location.search);
-const fromUrl = params.getAll('add');
-if (fromUrl.length > 0) {
-  addSources(fromUrl.join('\n'));
-  history.replaceState(null, '', window.location.pathname);
+// URL-import: /addstreams?kanaal+kanaal of ?add=<url>&add=<url>
+const importPath = /\/addstreams\/?$/i.test(window.location.pathname);
+const fromUrl = parseImportSearch(window.location.search);
+if (fromUrl.length > 0) addSources(fromUrl.join('\n'));
+if (fromUrl.length > 0 || importPath) {
+  // Houd de adresbalk schoon en bruikbaar voor de Twitch-login (redirect-URI).
+  const cleanPath = importPath
+    ? window.location.pathname.replace(/\/?addstreams\/?$/i, '/') || '/'
+    : window.location.pathname;
+  history.replaceState(null, '', cleanPath + window.location.hash);
 }
+// /addstreams zonder streams: open het toevoegvenster.
+if (importPath && fromUrl.length === 0) addModal.showModal();
 
 // Handige debug-hook in de console.
 Object.assign(window, {
