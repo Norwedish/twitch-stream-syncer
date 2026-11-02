@@ -278,6 +278,26 @@ export class SyncEngine {
     this.callbacks.onStateChange();
   }
 
+  /**
+   * Start één stream opnieuw op (zelfde plek in de lijst, zelfde instellingen).
+   * Gebruikt na in- of uitloggen bij Twitch: de playlist wordt dan opnieuw
+   * opgehaald, met of zonder het token van de kijker.
+   */
+  reload(id: string): void {
+    const index = this.views.findIndex((v) => v.config.id === id);
+    if (index === -1) return;
+    const old = this.views[index];
+    const config = { ...old.config };
+    const wasMaster = this.masterId === id;
+    const focused = this.focusedId === id;
+    this.remove(id);
+    this.add(config);
+    const card = findView(this.views, id)?.card;
+    if (card) this.grid.insertBefore(card, this.grid.children[index] ?? null);
+    if (wasMaster) this.setMaster(id);
+    if (focused) this.setFocused(id);
+  }
+
   playAll(): void {
     this.running = true;
     for (const v of this.views) {

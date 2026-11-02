@@ -62,18 +62,11 @@ export class TwitchPlaybackError extends Error {
 }
 
 async function fetchAccessToken(channel: string, playerType: string): Promise<{ value: string; signature: string }> {
-  const response = await fetch('https://gql.twitch.tv/gql', {
-    method: 'POST',
-    headers: {
-      'Client-ID': TWITCH_CLIENT_ID,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      operationName: 'PlaybackAccessToken',
-      query: ACCESS_TOKEN_QUERY,
-      variables: { login: channel, playerType },
-    }),
-  });
+  let response = await requestToken(channel, playerType, true);
+  // Verlopen of ongeldig token? Dan anoniem verder, zodat de stream blijft werken.
+  if (response.status === 401 || response.status === 403) {
+    response = await requestToken(channel, playerType, false);
+  }
   if (!response.ok) {
     throw new TwitchPlaybackError(`Twitch GraphQL gaf HTTP ${response.status}.`);
   }
@@ -88,14 +81,57 @@ async function fetchAccessToken(channel: string, playerType: string): Promise<{ 
   return token;
 }
 
-  /**
-   * Haalt de HLS-playlist van een Twitch-kanaal op.
-   * `quality` is een kwaliteitsnaam zoals "1080p60", of "best"/"worst".
-   *
-   * Twitch levert per kanaal één playlist met een vaste kwaliteit, dus de
-   * "master" bevat geen varianten; dan gebruiken we die playlist zelf.
-   */
-export async function resolveTwitchPlayback(channel: string, quality = 'best'): Promise<TwitchPlayback> {  const login = channel.toLowerCase();
+function requestToken(channel: string, playerType: string, withAuth: boolean): Promise<Response> {
+  return fetch('https://gql.twitch.tv/gql', {
+    method: 'POST',
+    headers: {
+      'Client-ID': TWITCH_CLIENT_ID,
+      'Content-Type': 'application/json',
+      // Met het OAuth-token van de kijker: Twitch kent dan abonnementen en
+      // Turbo/Prime, en levert dan de stream zonder advertenties.
+      ...(withAuth ? authHeaders() : {}),
+    },
+    body: JSON.stringify({
+      operationName: 'PlaybackAccessToken',
+      query: ACCESS_TOKEN_QUERY,
+      variables: { login: channel, playerType },
+    }),
+  });
+}
+
+/**
+ * Kop met het OAuth-token van de kijker, als die is ingelogd. Zonder token is
+ * de request anoniem (en kan Twitch advertenties invoegen).
+ */
+function authHeaders(): Record<string, string> {
+  const token = currentAccessToken();
+  return token ? { Authorization: `OAuth ${token}` } : {};
+}
+
+/** Wordt gezet door de app (zie main.ts) zodra de login verandert. */
+let accessTokenProvider: () => string | null = () => null;
+
+export function setTwitchTokenProvider(provider: () => string | null): void {
+  accessTokenProvider = provider;
+}
+
+function currentAccessToken(): string | null {
+  try {
+    return accessTokenProvider();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Haalt de HLS-playlist van een Twitch-kanaal op.
+ * `quality` is een kwaliteitsnaam zoals "1080p60", of "best"/"worst".
+ *
+ * Twitch levert per kanaal één playlist met een vaste kwaliteit, dus de
+ * "master" bevat geen varianten; dan gebruiken we die playlist zelf.
+ */
+export async function resolveTwitchPlayback(channel: string, quality = 'best'): Promise<TwitchPlayback> {
+  const login = channel.toLowerCase();
   let token: { value: string; signature: string };
   try {
     token = await fetchAccessToken(login, 'site');

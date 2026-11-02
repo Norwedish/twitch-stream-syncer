@@ -114,6 +114,12 @@ at any time. Turn the setting off to use the official embed. Embeds are
 third-party iframes: they cannot be seeked and their exact latency is not
 observable, so those streams can only be synced *relatively*.
 
+**Ads.** When you are logged in (*Settings → Twitch account*), the HLS playlist
+is requested with your Twitch token. Twitch then knows about your subscriptions
+and Turbo/Prime, so it serves the stream without ad breaks. Without a login the
+request is anonymous and Twitch may insert ads. If the token is rejected, the
+app falls back to an anonymous request so the stream keeps working.
+
 ## Settings
 
 - **Language** – English, Dutch, German, French or Spanish. Defaults to your

@@ -16,6 +16,7 @@ import { parseSourceList } from './import';
 import { parseSource, type StreamConfig } from './sources';
 import { DEFAULT_SETTINGS, loadState, newStreamId, saveState, type AppSettings } from './store';
 import type { SyncPlan } from './sync';
+import { setTwitchTokenProvider } from './twitch-hls';
 import {
   consumeTokenFromUrl,
   loadAuth,
@@ -41,6 +42,10 @@ document.documentElement.lang = lang;
 
 /** Twitch-login van deze browser (zie twitch-auth.ts). */
 let twitchAuth: TwitchAuth | null = loadAuth();
+
+// De HLS-playlists worden met het token van de kijker opgehaald, zodat Twitch
+// abonnementen/Turbo kent en geen advertenties invoegt.
+setTwitchTokenProvider(() => twitchAuth?.accessToken ?? null);
 
 const app = document.getElementById('app') as HTMLElement;
 document.body.classList.remove('app-loading');
@@ -475,11 +480,31 @@ btnTwitchLogin?.addEventListener('click', () => {
     logout();
     twitchAuth = null;
     renderTwitchLogin();
+    restartTwitchStreams();
     return;
   }
   // Naar Twitch; Twitch stuurt ons terug met een token in de URL.
   window.location.href = loginUrl();
 });
+
+/**
+ * Na in- of uitloggen: de Twitch-streams opnieuw opstarten, zodat de
+ * HLS-playlists met (of zonder) het token worden opgehaald. Met een
+ * abonnement of Turbo levert Twitch dan een stream zonder advertenties.
+ */
+function restartTwitchStreams(): void {
+  for (const stream of streams) {
+    if (stream.kind !== 'twitch-hls') continue;
+    stream.resolvedUrl = undefined;
+    stream.resolvedAt = undefined;
+  }
+  persist();
+  for (const view of [...engine.getViews()]) {
+    if (view.config.kind !== 'twitch-hls') continue;
+    const stream = streams.find((s) => s.id === view.config.id);
+    if (stream) engine.reload(view.config.id);
+  }
+}
 
 /** Verwerkt een terugkeer van de Twitch-login. */
 async function handleTwitchReturn(): Promise<void> {
@@ -491,6 +516,7 @@ async function handleTwitchReturn(): Promise<void> {
     renderTwitchLogin();
     // De embeds lezen de Twitch-cookies bij het laden: chat opnieuw opbouwen.
     chat.reload();
+    restartTwitchStreams();
     toast(twitchAuth ? t.twitchLoggedIn(twitchAuth.login) : t.twitchLogin);
   } else {
     saveAuth(null);
