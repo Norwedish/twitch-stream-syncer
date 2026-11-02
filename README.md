@@ -77,8 +77,11 @@ For the login you need your own Twitch application (the redirect URI of your
 site must be registered there, otherwise Twitch returns `redirect_mismatch`):
 
 1. Go to <https://dev.twitch.tv/console/apps> → **Register Your Application**.
-2. Add your site as an OAuth redirect URL, exactly with trailing slash, e.g.
-   `http://localhost:5173/`, `https://norwedish.github.io/twitch-stream-syncer/`.
+2. Add your production site as an OAuth redirect URL, exactly as the app shows
+   it in the login dialog (with trailing slash), e.g.
+   `https://streamsyncer.norwelab.nl/`. No localhost URL is needed for
+   production. Add `http://localhost:5173/` only if you also want to test the
+   login on a local dev server.
 3. Copy the Client ID and set it as the GitHub **variable** `TWITCH_CLIENT_ID`
    (Settings → Secrets and variables → Actions → Variables). The build picks it
    up as `VITE_TWITCH_CLIENT_ID`.
