@@ -54,6 +54,8 @@ function twitchProxy(): Plugin {
 }
 
 export default defineConfig({
+  // Relatieve paden, zodat de build ook op een subpad werkt (GitHub Pages).
+  base: './',
   plugins: [twitchProxy()],
   server: {
     port: 5173,
