@@ -262,6 +262,7 @@ app.innerHTML = `
 
 const grid = document.getElementById('grid') as HTMLElement;
 const workspace = document.getElementById('workspace') as HTMLElement;
+const appRoot = document.getElementById('app') as HTMLElement;
 const chatRoot = document.getElementById('chat') as HTMLElement;
 const chatEmpty = chatRoot.querySelector('.chat-empty') as HTMLElement;
 const emptyState = document.getElementById('empty-state') as HTMLElement;
@@ -398,6 +399,9 @@ function updateLayout(): void {
   });
   chat.setMode(mode);
   workspace.dataset.chat = mode === 'inline' ? 'inline' : placement;
+  // In inline-modus is de pagina precies één scherm hoog, zodat de streams
+  // tot onderaan de pagina doorlopen.
+  appRoot.classList.toggle('chat-inline', mode === 'inline');
   chatEmpty.textContent = t.chatEmpty;
   chat.setTabs(chatTabs());
   if (mode === 'inline') {

@@ -463,6 +463,28 @@ code {
 
 .workspace[data-chat='inline'] {
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* Inline-modus: de pagina is precies één scherm hoog (topbar + workspace),
+   zodat de streamkaarten tot onderaan de pagina doorlopen. */
+#app.chat-inline {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.workspace[data-chat='inline'] .board {
+  min-height: 0;
+  height: 100%;
+}
+
+.workspace[data-chat='inline'] .grid {
+  height: 100%;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.workspace[data-chat='inline'] .card {
+  min-height: 0;
 }
 
 .workspace[data-chat='inline'] .chat {
@@ -630,24 +652,24 @@ code {
   min-height: 0;
 }
 
-/* Chat onder de streamkaart (inline-modus). */
-.card.has-inline-chat {
-  --inline-chat-height: clamp(240px, 34vh, 380px);
-}
-
+/* Chat onder de streamkaart (inline-modus): vult de resterende hoogte van de
+   kaart, zodat de chat tot onderaan de pagina doorloopt. */
 .card-chat {
   display: flex;
   flex-direction: column;
-  height: var(--inline-chat-height);
+  flex: 1 1 auto;
   min-height: 240px;
   border-top: 1px solid var(--border);
   background: #18181b;
 }
 
-/* De offline-placeholder blijft binnen het streamgedeelte en bedekt de chat
-   eronder niet: de chat moet ook leesbaar zijn als de stream offline is. */
+/* De offline-placeholder bedekt alleen het streamgedeelte (zelfde 16:9 als de
+   stage), niet de chat eronder: die moet ook leesbaar zijn als de stream
+   offline is. */
 .card.has-inline-chat > .card-offline {
-  bottom: var(--inline-chat-height);
+  inset: 0 0 auto 0;
+  height: auto;
+  aspect-ratio: 16 / 9;
 }
 
 .card-chat .chat-pane {
@@ -719,6 +741,16 @@ code {
   aspect-ratio: auto;
   height: calc(100vh - 250px);
   min-height: 360px;
+}
+
+/* Inline-modus: de stage houdt de gewone 16:9-verhouding (ook bij focus);
+   de chat eronder vult de rest van de kaart tot onderaan de pagina. */
+.workspace[data-chat='inline'] .card-stage,
+.workspace[data-chat='inline'] .card.is-focused .card-stage {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  min-height: 0;
+  flex: none;
 }
 
 .card-stage > video,.card-stage > iframe,.embed-holder,.embed-holder iframe {
