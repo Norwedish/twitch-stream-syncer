@@ -100,14 +100,20 @@ dark theme regardless of your Twitch site setting.
 
 The layout adapts to the number of streams:
 
-- **Even number of streams** – the chat sits in a sidebar next to the streams,
-  like on Twitch itself.
-- **Odd number of streams** – the chat becomes a block in the grid, filling the
-  empty spot next to the streams.
+- **Even number of streams** – the chat sits in a tall sidebar next to the
+  streams, like on Twitch itself. Because the block is taller than wide, you can
+  show the chats **stacked** above each other, or use **tabs**.
+- **Odd number of streams** – the chat becomes a wide block in the grid, filling
+  the empty spot next to the streams. Because the block is wider than tall, you
+  can show the chats **side by side**, or use **tabs**.
+- **Up to 3 streams** – you can also put each Twitch chat directly **under its
+  stream card**, so every stream and its chat stay together.
 
-Clicking a stream (or its chat tab) makes it the active stream: it gets the
-sound and its chat is shown. Tabs keep their history while you switch between
-them.
+The layout buttons sit at the top right of the chat panel. Unavailable options
+are hidden, and your choice is remembered in the browser. Clicking a stream (or
+a chat tab/pane header) makes it the active stream: it gets the sound and its
+chat is highlighted. Tabs and split panes keep their history while you switch
+between them.
 
 ## What is (not) possible
 

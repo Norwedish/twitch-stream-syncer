@@ -1,5 +1,5 @@
 import './style.css';
-import { ChatPanel, type ChatTab } from './chat';
+import { ChatPanel, type ChatMode, type ChatTab } from './chat';
 import { SyncEngine, type StreamView } from './engine';
 import {
   LANGS,
@@ -313,11 +313,24 @@ function persist(): void {
 
 /* ---------------------------------- chat ---------------------------------- */
 
-const chat = new ChatPanel(chatRoot, () => {
-  // Tabwissel: de bijbehorende stream wordt de actieve stream (geluid).
-  const id = chat.getActiveId();
-  if (id) engine.activate(id);
-});
+const chat = new ChatPanel(
+  chatRoot,
+  () => {
+    // Tabwissel: de bijbehorende stream wordt de actieve stream (geluid).
+    const id = chat.getActiveId();
+    if (id) engine.activate(id);
+  },
+  () => ({
+    chat: t.chat,
+    layout: t.chatLayout,
+    tabs: t.chatLayoutTabs,
+    columns: t.chatLayoutColumns,
+    stacked: t.chatLayoutStacked,
+    inline: t.chatLayoutInline,
+    inlineNote: t.chatInlineNote,
+  }),
+  (mode) => setChatMode(mode),
+);
 
 /** Twitch-kanalen in de volgorde waarin de streams zijn toegevoegd. */
 function chatTabs(): ChatTab[] {
@@ -326,18 +339,76 @@ function chatTabs(): ChatTab[] {
     .map((s) => ({ id: s.id, channel: s.ref, label: s.label || s.ref }));
 }
 
+/** Alleen bij maximaal 3 streams (en minstens één Twitch-chat). */
+function canUseInlineChat(): boolean {
+  const count = engine.getViews().length;
+  return count > 0 && count <= 3 && chatTabs().length > 0;
+}
+
+/** Maakt (of hergebruikt) het chatblok onder elke Twitch-streamkaart. */
+function inlineChatHosts(): Map<string, HTMLElement> {
+  const hosts = new Map<string, HTMLElement>();
+  for (const view of engine.getViews()) {
+    const hasChat = view.config.kind === 'twitch' || view.config.kind === 'twitch-hls';
+    if (!hasChat) {
+      view.card.querySelector(':scope > .card-chat')?.remove();
+      continue;
+    }
+    let host = view.card.querySelector<HTMLElement>(':scope > .card-chat');
+    if (!host) {
+      host = document.createElement('section');
+      host.className = 'card-chat';
+      view.card.appendChild(host);
+    }
+    host.setAttribute('aria-label', t.chat);
+    hosts.set(view.config.id, host);
+  }
+  return hosts;
+}
+
+function removeInlineChatHosts(): void {
+  for (const view of engine.getViews()) {
+    view.card.querySelector(':scope > .card-chat')?.remove();
+  }
+}
+
 /**
- * Kiest de indeling: bij een even aantal streams een zijbalk naast de streams,
- * bij een oneven aantal een chatblok in het raster (op de plek van de lege
- * kaart), zodat de streams en de chat samen een volle rechthoek vormen.
+ * Kiest de plaats van het chatpaneel (zijbalk of raster) en de gekozen
+ * chatindeling. De beschikbare indelingen hangen af van de vorm van het
+ * chatblok: breed = naast elkaar, hoog = boven elkaar.
  */
 function updateLayout(): void {
   const count = engine.getViews().length;
-  const layout = count > 0 && count % 2 === 1 ? 'panel' : 'sidebar';
-  chat.setLayout(layout);
-  workspace.dataset.chat = layout;
+  const placement = count > 0 && count % 2 === 1 ? 'panel' : 'sidebar';
+  const inlineAvailable = canUseInlineChat();
+
+  let mode = settings.chatMode;
+  if (mode === 'columns' && placement !== 'panel') mode = 'tabs';
+  if (mode === 'stacked' && placement !== 'sidebar') mode = 'tabs';
+  if (mode === 'inline' && !inlineAvailable) mode = 'tabs';
+
+  chat.setPlacement(placement);
+  chat.setAvailability({
+    columns: placement === 'panel',
+    stacked: placement === 'sidebar',
+    inline: inlineAvailable,
+  });
+  chat.setMode(mode);
+  workspace.dataset.chat = mode === 'inline' ? 'inline' : placement;
   chatEmpty.textContent = t.chatEmpty;
   chat.setTabs(chatTabs());
+  if (mode === 'inline') {
+    chat.setInlineHosts(inlineChatHosts());
+  } else {
+    chat.setInlineHosts(new Map());
+    removeInlineChatHosts();
+  }
+}
+
+function setChatMode(mode: ChatMode): void {
+  settings.chatMode = mode;
+  persist();
+  updateLayout();
 }
 
 const engine = new SyncEngine(
@@ -484,6 +555,8 @@ function applyLanguage(): void {
   }
 
   // Kaarten en statusbalk opnieuw opbouwen met de nieuwe taal.
+  chat.refreshLabels();
+  updateLayout();
   engine.relocalize();
   renderStatus(engine.getViews(), engine.getPlan());
   syncSettingsForm();

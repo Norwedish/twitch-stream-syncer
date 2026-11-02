@@ -1,3 +1,4 @@
+import type { ChatMode } from './chat';
 import type { StreamConfig } from './sources';
 
 const STORAGE_KEY = 'stream-syncer:state:v2';
@@ -23,6 +24,8 @@ export interface AppSettings {
    * gepauzeerd, playlist-venster versprongen); dan wisselen we niet.
    */
   maxPlausibleGap: number;
+  /** Indeling van de chat: tabs, naast elkaar, boven elkaar of onder de streams. */
+  chatMode: ChatMode;
 }
 
 export interface AppState {
@@ -40,7 +43,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   anchorSwitchMargin: 3,
   /** Bij meer dan dit verschil (s) vertrouwen we een meting niet en wisselen we niet. */
   maxPlausibleGap: 60,
+  chatMode: 'tabs',
 };
+
+const CHAT_MODES: readonly ChatMode[] = ['tabs', 'columns', 'stacked', 'inline'];
+
+function isChatMode(value: unknown): value is ChatMode {
+  return typeof value === 'string' && (CHAT_MODES as readonly string[]).includes(value);
+}
 
 export function loadState(): AppState {
   try {
@@ -48,10 +58,12 @@ export function loadState(): AppState {
     if (!raw) return { version: 2, streams: [], settings: { ...DEFAULT_SETTINGS } };
     const parsed = JSON.parse(raw) as Partial<AppState>;
     const streams = Array.isArray(parsed.streams) ? parsed.streams.filter(isStreamConfig) : [];
+    const settings: AppSettings = { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) };
+    if (!isChatMode(settings.chatMode)) settings.chatMode = 'tabs';
     return {
       version: 2,
       streams,
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      settings,
     };
   } catch {
     return { version: 2, streams: [], settings: { ...DEFAULT_SETTINGS } };
