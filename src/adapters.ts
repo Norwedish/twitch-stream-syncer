@@ -146,7 +146,7 @@ class MediaAdapter implements StreamAdapter {
       });
       this.hls = hls;
       if (this.kind === 'twitch-hls') {
-        // Twitch-URL's lopen via de dev-proxy; relatieve verwijzingen in de
+        // Twitch-URL's lopen via de proxy; relatieve verwijzingen in de
         // playlist moeten ook weer naar de proxy.
         const DefaultLoader = Hls.DefaultConfig.loader;
         hls.config.loader = class extends DefaultLoader {

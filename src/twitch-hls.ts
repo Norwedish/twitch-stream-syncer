@@ -16,7 +16,7 @@
  * dan terug op de officiële embed (instelling "Twitch via HLS").
  */
 
-import { HAS_TWITCH_PROXY } from './twitch-proxy.ts';
+import { HAS_TWITCH_PROXY, proxifyTwitch } from './twitch-proxy.ts';
 
 /** Publieke client-ID van de Twitch-webplayer. */
 const TWITCH_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
@@ -152,8 +152,8 @@ export async function resolveTwitchPlayback(channel: string, quality = 'best'): 
     allow_spectre: 'false',
   });
   const masterUrl = `https://usher.ttvnw.net/api/channel/hls/${login}.m3u8?${params}`;
-  // In de dev-server loopt dit via de proxy (Twitch stuurt geen CORS-headers).
-  const fetchUrl = HAS_TWITCH_PROXY ? `/twitch-hls/${masterUrl.replace('://', ':/')}` : masterUrl;
+  // Twitch stuurt geen CORS-headers: de playlist loopt via de proxy.
+  const fetchUrl = proxifyTwitch(masterUrl);
 
   let masterText: string;
   try {
@@ -170,12 +170,11 @@ export async function resolveTwitchPlayback(channel: string, quality = 'best'): 
   } catch (error) {
     if (error instanceof TwitchPlaybackError) throw error;
     // Geen CORS-headers op usher.ttvnw.net: de browser mag deze playlist niet
-    // lezen. Een proxy (npm run dev) lost dat op.
-    const viaProxy = HAS_TWITCH_PROXY;
+    // lezen. De proxy lost dat op; zonder proxy blokkeert Twitch de request.
     throw new TwitchPlaybackError(
-      viaProxy
-        ? 'Twitch-playlist niet bereikbaar via de proxy. Controleer of `npm run dev` draait en herstart de server na een wijziging in vite.config.ts.'
-        : 'Twitch blokkeert directe toegang tot de playlist (CORS). Start de app via `npm run dev` zodat de proxy gebruikt wordt.',
+      HAS_TWITCH_PROXY
+        ? 'Twitch-playlist niet bereikbaar via de proxy. Controleer of de proxy draait (npm run dev, of de Worker-URL in VITE_TWITCH_PROXY_ORIGIN).'
+        : 'Twitch blokkeert directe toegang tot de playlist (CORS). Zet de proxy aan via VITE_TWITCH_PROXY_ORIGIN.',
     );
   }
 

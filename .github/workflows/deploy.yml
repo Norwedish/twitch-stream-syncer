@@ -7,6 +7,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -21,7 +27,9 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  deploy:
+  # De proxy draait op Cloudflare Workers (worker/index.ts).
+  # Vereist de repository-secrets CLOUDFLARE_API_TOKEN en CLOUDFLARE_ACCOUNT_ID.
+  worker:
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -31,11 +39,34 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
-      # Vereist de repository-secrets CLOUDFLARE_API_TOKEN en CLOUDFLARE_ACCOUNT_ID.
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy proxy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --minify
+
+  # De app zelf draait statisch op GitHub Pages en gebruikt de Worker als proxy.
+  pages:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build for GitHub Pages
+        run: npm run build
+        env:
+          VITE_TWITCH_PROXY_ORIGIN: https://worker.norwelab.nl
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
