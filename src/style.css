@@ -631,13 +631,23 @@ code {
 }
 
 /* Chat onder de streamkaart (inline-modus). */
+.card.has-inline-chat {
+  --inline-chat-height: clamp(240px, 34vh, 380px);
+}
+
 .card-chat {
   display: flex;
   flex-direction: column;
-  height: clamp(240px, 34vh, 380px);
+  height: var(--inline-chat-height);
   min-height: 240px;
   border-top: 1px solid var(--border);
   background: #18181b;
+}
+
+/* De offline-placeholder blijft binnen het streamgedeelte en bedekt de chat
+   eronder niet: de chat moet ook leesbaar zijn als de stream offline is. */
+.card.has-inline-chat > .card-offline {
+  bottom: var(--inline-chat-height);
 }
 
 .card-chat .chat-pane {

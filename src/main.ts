@@ -351,6 +351,7 @@ function inlineChatHosts(): Map<string, HTMLElement> {
   for (const view of engine.getViews()) {
     const hasChat = view.config.kind === 'twitch' || view.config.kind === 'twitch-hls';
     if (!hasChat) {
+      view.card.classList.remove('has-inline-chat');
       view.card.querySelector(':scope > .card-chat')?.remove();
       continue;
     }
@@ -360,6 +361,7 @@ function inlineChatHosts(): Map<string, HTMLElement> {
       host.className = 'card-chat';
       view.card.appendChild(host);
     }
+    view.card.classList.add('has-inline-chat');
     host.setAttribute('aria-label', t.chat);
     hosts.set(view.config.id, host);
   }
@@ -368,6 +370,7 @@ function inlineChatHosts(): Map<string, HTMLElement> {
 
 function removeInlineChatHosts(): void {
   for (const view of engine.getViews()) {
+    view.card.classList.remove('has-inline-chat');
     view.card.querySelector(':scope > .card-chat')?.remove();
   }
 }
