@@ -41,6 +41,10 @@ export interface EngineCallbacks {
   /** Gebruiker vinkt "referentie" aan of uit voor deze stream. */
   onToggleForcedAnchor: (id: string) => void;
   onNudge: (id: string, delta: number) => void;
+  /** De gebruiker klikt op een stream (kaart of tabblad). */
+  onActivate?: (id: string) => void;
+  /** Er is een stream toegevoegd (om die direct actief te maken). */
+  onAdded?: (id: string) => void;
 }
 
 const TICK_MS = 250;
@@ -112,6 +116,7 @@ export class SyncEngine {
       view.card.classList.toggle('is-dimmed', id !== null && view.config.id !== id);
     }
     this.callbacks.onStateChange();
+    if (id !== null) this.activate(id);
   }
 
   add(config: StreamConfig): StreamView {
@@ -153,7 +158,30 @@ export class SyncEngine {
     this.applyAudio();
     this.callbacks.onStateChange();
     this.refreshCard(view);
+    this.callbacks.onAdded?.(config.id);
     return view;
+  }
+
+  /**
+   * De gebruiker klikt op een stream: die wordt de actieve stream (geluid en
+   * chat). Een stream die de gebruiker zelf had gepauzeerd blijft gepauzeerd.
+   */
+  activate(id: string): void {
+    const v = findView(this.views, id);
+    if (!v) return;
+    if (this.masterId !== id) {
+      this.masterId = id;
+      for (const other of this.views) {
+        other.config.muted = other.config.id !== id;
+      }
+      this.applyAudio();
+    }
+    if (v.userPaused) {
+      v.userPaused = false;
+      v.enginePaused = false;
+      void v.adapter.play();
+    }
+    this.callbacks.onStateChange();
   }
 
   /**
@@ -314,10 +342,19 @@ export class SyncEngine {
     this.views = [];
   }
 
+  /** De laatst toegevoegde stream (of null). */
+  lastAddedId(): string | null {
+    return this.views[this.views.length - 1]?.config.id ?? null;
+  }
+
   private bindCard(card: HTMLElement, id: string): void {
     card.addEventListener('click', (event) => {
       const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
-      if (!target) return;
+      if (!target) {
+        // Klik naast de knoppen: deze stream wordt de actieve stream.
+        this.callbacks.onActivate?.(id);
+        return;
+      }
       // Het vinkje heeft een eigen change-handler.
       if (target.dataset.action === 'force-anchor') return;
       switch (target.dataset.action) {

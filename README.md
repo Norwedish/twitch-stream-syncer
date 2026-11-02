@@ -59,6 +59,22 @@ stream is behind: the viewer sees an older moment of the broadcast.
    (0.5 s per click, positive = play later). The **TV icon** on a card opens the
    stream page (twitch.tv/channel or the YouTube video) in a new tab.
 
+## Chat
+
+Every Twitch stream gets a tab in the chat panel, in the order you added the
+streams. Each tab is Twitch's own chat embed, so you are logged in with all the
+usual features (badges, replies, moderation, polls). The layout adapts to the
+number of streams:
+
+- **Even number of streams** – the chat sits in a sidebar next to the streams,
+  like on Twitch itself.
+- **Odd number of streams** – the chat becomes a block in the grid, filling the
+  empty spot next to the streams.
+
+Clicking a stream (or its chat tab) makes it the active stream: it gets the
+sound and its chat is shown. Tabs keep their history while you switch between
+them.
+
 ## What is (not) possible
 
 | Source | Latency measurement | Correction |
@@ -178,6 +194,7 @@ Source layout:
 - `src/sync.ts` – the sync engine: pick the reference, compute corrections.
 - `src/engine.ts` – cards, audio, restarts and the tick loop.
 - `src/i18n.ts` – languages, cookie and all translations.
+- `src/chat.ts` – chat panel with a Twitch chat embed per stream.
 - `src/main.ts` – UI, storage and settings.
 - `server/index.mjs` – self-hosted server (static files + Twitch proxy).
 - `worker/index.ts` – Cloudflare Worker (static files + Twitch proxy).

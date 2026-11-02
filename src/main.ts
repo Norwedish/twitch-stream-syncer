@@ -1,4 +1,5 @@
 import './style.css';
+import { ChatPanel, type ChatTab } from './chat';
 import { SyncEngine, type StreamView } from './engine';
 import {
   LANGS,
@@ -113,7 +114,7 @@ app.innerHTML = `
     </div>
   </header>
 
-  <main class="workspace">
+  <main class="workspace" id="workspace">
     <section class="board" id="board">
       <div class="grid" id="grid"></div>
       <div class="empty-state" id="empty-state">
@@ -123,6 +124,12 @@ app.innerHTML = `
         <button type="button" class="btn btn-primary" id="empty-add"></button>
       </div>
     </section>
+
+    <aside class="chat" id="chat" data-layout="sidebar">
+      <div class="chat-tabs" role="tablist"></div>
+      <div class="chat-body"></div>
+      <div class="chat-empty"></div>
+    </aside>
   </main>
 
   <dialog class="modal" id="add-modal">
@@ -207,6 +214,9 @@ app.innerHTML = `
 `;
 
 const grid = document.getElementById('grid') as HTMLElement;
+const workspace = document.getElementById('workspace') as HTMLElement;
+const chatRoot = document.getElementById('chat') as HTMLElement;
+const chatEmpty = chatRoot.querySelector('.chat-empty') as HTMLElement;
 const emptyState = document.getElementById('empty-state') as HTMLElement;
 const statusEl = document.getElementById('sync-status') as HTMLElement;
 const addModal = document.getElementById('add-modal') as HTMLDialogElement;
@@ -250,11 +260,41 @@ function persist(): void {
   saveState({ version: 2, streams, settings });
 }
 
+/* ---------------------------------- chat ---------------------------------- */
+
+const chat = new ChatPanel(chatRoot, () => {
+  // Tabwissel: de bijbehorende stream wordt de actieve stream (geluid).
+  const id = chat.getActiveId();
+  if (id) engine.activate(id);
+});
+
+/** Twitch-kanalen in de volgorde waarin de streams zijn toegevoegd. */
+function chatTabs(): ChatTab[] {
+  return streams
+    .filter((s) => s.kind === 'twitch' || s.kind === 'twitch-hls')
+    .map((s) => ({ id: s.id, channel: s.ref, label: s.label || s.ref }));
+}
+
+/**
+ * Kiest de indeling: bij een even aantal streams een zijbalk naast de streams,
+ * bij een oneven aantal een chatblok in het raster (op de plek van de lege
+ * kaart), zodat de streams en de chat samen een volle rechthoek vormen.
+ */
+function updateLayout(): void {
+  const count = engine.getViews().length;
+  const layout = count > 0 && count % 2 === 1 ? 'panel' : 'sidebar';
+  chat.setLayout(layout);
+  workspace.dataset.chat = layout;
+  chatEmpty.textContent = t.chatEmpty;
+  chat.setTabs(chatTabs());
+}
+
 const engine = new SyncEngine(
   grid,
   {
     onStateChange: () => {
       updateEmptyState();
+      updateLayout();
       persist();
     },
     onTick: (views, plan) => renderStatus(views, plan),
@@ -263,6 +303,14 @@ const engine = new SyncEngine(
       if (index !== -1) streams.splice(index, 1);
       engine.remove(id);
       persist();
+    },
+    onActivate: (id) => {
+      if (chat.getActiveId() !== id) chat.activate(id);
+    },
+    onAdded: (id) => {
+      // Nieuwe stream meteen actief: geluid aan en chat op de nieuwe tab.
+      engine.activate(id);
+      chat.activate(id);
     },
     onTogglePause: (id) => engine.togglePause(id),
     onToggleForcedAnchor: (id) => {
