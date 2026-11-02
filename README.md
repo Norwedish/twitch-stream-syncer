@@ -66,10 +66,13 @@ streams. Each tab is Twitch's own chat embed, so you are logged in exactly when
 your browser is logged in on twitch.tv — the app uses Twitch's own login (see
 below) or the session you already have there.
 
-**Login and theme.** Use **Settings → Twitch account** to log in with Twitch.
-The app never sees your password: Twitch redirects back with a token in the URL
-fragment, which is stored in your browser only. After logging in, the chat and
-the streams are logged in, just like on twitch.tv.
+**Login and theme.** The first time you open the app without being logged in,
+a dialog offers to log in with Twitch and explains why (your own chat account,
+subscriptions/Turbo, no ads). You can close it and continue anonymously; it is
+shown once per browser. You can always log in later via **Settings → Twitch
+account**. The app never sees your password: Twitch redirects back with a token
+in the URL fragment, which is stored in your browser only. After logging in, the
+chat and the streams are logged in, just like on twitch.tv.
 
 The chat embed is opened with Twitch's `darkpopout` option, so it uses Twitch's
 dark theme regardless of your Twitch site setting. A page cannot restyle an

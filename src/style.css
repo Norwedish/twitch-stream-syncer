@@ -970,6 +970,42 @@ output {
   white-space: pre-wrap;
 }
 
+/* ----------------------------- inlogvenster ------------------------------ */
+
+.login-body {
+  gap: 14px;
+}
+
+.login-intro {
+  margin: 0;
+  color: var(--text);
+}
+
+.login-reasons {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-reasons li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--text-muted);
+  font-size: calc(13px * var(--font-scale));
+}
+
+.login-reasons li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--good);
+  font-weight: 700;
+}
+
 /* -------------------------------- responsive ------------------------------ */
 @media (max-width: 1100px) {
   .topbar {

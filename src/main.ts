@@ -43,6 +43,9 @@ document.documentElement.lang = lang;
 /** Twitch-login van deze browser (zie twitch-auth.ts). */
 let twitchAuth: TwitchAuth | null = loadAuth();
 
+/** Onthoudt dat het inlogvenster al eens getoond is (één keer per browser). */
+const LOGIN_PROMPT_KEY = 'stream-syncer:login-prompt-shown';
+
 // De HLS-playlists worden met het token van de kijker opgehaald, zodat Twitch
 // abonnementen/Turbo kent en geen advertenties invoegt.
 setTwitchTokenProvider(() => twitchAuth?.accessToken ?? null);
@@ -231,6 +234,26 @@ app.innerHTML = `
     </form>
   </dialog>
 
+  <dialog class="modal" id="login-modal">
+    <div class="modal-body login-body">
+      <header class="modal-head">
+        <h2 data-i18n="loginTitle"></h2>
+        <button type="button" class="icon-btn" data-close>${ICON_CLOSE}</button>
+      </header>
+      <p class="login-intro" data-i18n="loginIntro"></p>
+      <ul class="login-reasons">
+        <li data-i18n="loginReasonChat"></li>
+        <li data-i18n="loginReasonSubs"></li>
+        <li data-i18n="loginReasonAds"></li>
+      </ul>
+      <p class="field-hint" data-i18n="loginPrivacy"></p>
+      <footer class="modal-foot">
+        <button type="button" class="btn" data-close data-i18n="loginAnonymous"></button>
+        <button type="button" class="btn btn-primary" id="login-modal-go" data-i18n="loginGo"></button>
+      </footer>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" hidden></div>
 `;
 
@@ -242,6 +265,8 @@ const emptyState = document.getElementById('empty-state') as HTMLElement;
 const statusEl = document.getElementById('sync-status') as HTMLElement;
 const addModal = document.getElementById('add-modal') as HTMLDialogElement;
 const settingsModal = document.getElementById('settings-modal') as HTMLDialogElement;
+const loginModal = document.getElementById('login-modal') as HTMLDialogElement;
+const loginModalGo = document.getElementById('login-modal-go') as HTMLButtonElement;
 const addInput = document.getElementById('add-input') as HTMLTextAreaElement;
 const addError = document.getElementById('add-error') as HTMLElement;
 const toastEl = document.getElementById('toast') as HTMLElement;
@@ -483,9 +508,32 @@ btnTwitchLogin?.addEventListener('click', () => {
     restartTwitchStreams();
     return;
   }
-  // Naar Twitch; Twitch stuurt ons terug met een token in de URL.
-  window.location.href = loginUrl();
+  startTwitchLogin();
 });
+
+/** Naar Twitch; Twitch stuurt ons terug met een token in de URL. */
+function startTwitchLogin(): void {
+  window.location.href = loginUrl();
+}
+
+loginModalGo?.addEventListener('click', () => {
+  loginModal.close();
+  startTwitchLogin();
+});
+
+/**
+ * Bij het openen zonder Twitch-login: één keer per browser een venster met
+ * "inloggen met Twitch" en de redenen. Sluiten = anoniem verder.
+ */
+function maybeShowLoginPrompt(): void {
+  if (twitchAuth) return;
+  if (localStorage.getItem(LOGIN_PROMPT_KEY)) return;
+  localStorage.setItem(LOGIN_PROMPT_KEY, '1');
+  // Even wachten zodat de pagina eerst zichtbaar is.
+  window.setTimeout(() => {
+    if (!twitchAuth && !loginModal.open) loginModal.showModal();
+  }, 600);
+}
 
 /**
  * Na in- of uitloggen: de Twitch-streams opnieuw opstarten, zodat de
@@ -815,6 +863,9 @@ Object.assign(window, {
 
 // Terug van de Twitch-login? Token uit de URL halen en de chat verversen.
 void handleTwitchReturn();
+
+// Niet ingelogd? Laat één keer per browser zien waarom inloggen handig is.
+maybeShowLoginPrompt();
 
 // Tijdens ontwikkeling: ?reset wist de opgeslagen streams.
 if (new URLSearchParams(window.location.search).has('reset')) {
