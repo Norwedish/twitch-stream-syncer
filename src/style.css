@@ -697,6 +697,12 @@ code {
   color: var(--accent);
 }
 
+#btn-twitch-login.is-logged-in {
+  border-color: rgba(145, 70, 255, 0.6);
+  background: rgba(145, 70, 255, 0.18);
+  color: #d9c2ff;
+}
+
 .offset-value {
   min-width: 44px;
   text-align: center;

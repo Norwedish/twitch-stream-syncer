@@ -16,6 +16,14 @@ import { parseSourceList } from './import';
 import { parseSource, type StreamConfig } from './sources';
 import { DEFAULT_SETTINGS, loadState, newStreamId, saveState, type AppSettings } from './store';
 import type { SyncPlan } from './sync';
+import {
+  consumeTokenFromUrl,
+  loadAuth,
+  loginUrl,
+  logout,
+  saveAuth,
+  type TwitchAuth,
+} from './twitch-auth';
 import { formatDelta, formatLatency } from './ui-utils';
 
 const ICON_SETTINGS = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-1.2-8h2.4l.4 2.3a7.6 7.6 0 0 1 2 .9l2-1.2 1.7 1.7-1.2 2c.4.6.7 1.3.9 2l2.3.4v2.4l-2.3.4a7.6 7.6 0 0 1-.9 2l1.2 2-1.7 1.7-2-1.2c-.6.4-1.3.7-2 .9l-.4 2.3h-2.4l-.4-2.3a7.6 7.6 0 0 1-2-.9l-2 1.2-1.7-1.7 1.2-2a7.6 7.6 0 0 1-.9-2L2 13.2v-2.4l2.3-.4c.2-.7.5-1.4.9-2l-1.2-2 1.7-1.7 2 1.2c.6-.4 1.3-.7 2-.9L10.8 2Z"/></svg>`;
@@ -30,6 +38,9 @@ const streams: StreamConfig[] = [...state.streams];
 let lang: Lang = resolveLanguage();
 let t: Messages = MESSAGES[lang];
 document.documentElement.lang = lang;
+
+/** Twitch-login van deze browser (zie twitch-auth.ts). */
+let twitchAuth: TwitchAuth | null = loadAuth();
 
 const app = document.getElementById('app') as HTMLElement;
 document.body.classList.remove('app-loading');
@@ -113,7 +124,6 @@ app.innerHTML = `
       <button type="button" class="icon-btn" id="btn-settings">${ICON_SETTINGS}</button>
     </div>
   </header>
-
   <main class="workspace" id="workspace">
     <section class="board" id="board">
       <div class="grid" id="grid"></div>
@@ -173,6 +183,12 @@ app.innerHTML = `
         </span>
         <input type="checkbox" id="set-twitch-hls" />
       </label>
+
+      <div class="field-row">
+        <span class="field-label" data-i18n="twitchLogin"></span>
+        <button type="button" class="btn" id="btn-twitch-login"></button>
+        <span class="field-hint" data-i18n="twitchLoginHint"></span>
+      </div>
 
       <label class="field-row">
         <span class="field-label" data-i18n="volume"></span>
@@ -238,6 +254,7 @@ const addHint = document.getElementById('add-hint') as HTMLElement;
 const addHintEnd = document.getElementById('add-hint-end') as HTMLElement;
 const settingsTitle = settingsModal.querySelector('h2') as HTMLElement;
 const setLanguage = document.getElementById('set-language') as HTMLSelectElement;
+const btnTwitchLogin = document.getElementById('btn-twitch-login') as HTMLButtonElement;
 
 let toastTimer = 0;
 
@@ -416,6 +433,7 @@ function applyLanguage(): void {
   addHint.textContent = t.addHint;
   addHintEnd.textContent = t.addHintEnd;
   settingsTitle.textContent = t.settingsTitle;
+  renderTwitchLogin();
 
   // De opties van de taalkeuze hebben ook een vertaalde naam.
   const autoOption = setLanguage.querySelector('option[value="auto"]');
@@ -437,6 +455,46 @@ function changeLanguage(next: Lang | null): void {
   lang = next ?? osLanguage();
   applyLanguage();
   toast(next === null ? t.languageAutoToast(LANG_NAMES[lang]) : t.languageChanged(LANG_NAMES[lang]));
+}
+
+/* -------------------------------- Twitch-login ---------------------------- */
+
+/**
+ * De knop in de instellingen: inloggen met Twitch (zet de Twitch-sessie in
+ * deze browser, zodat chat en streams ingelogd zijn) of uitloggen.
+ */
+function renderTwitchLogin(): void {
+  if (!btnTwitchLogin) return;
+  btnTwitchLogin.textContent = twitchAuth ? t.twitchLoggedIn(twitchAuth.login) : t.twitchLogin;
+  btnTwitchLogin.title = twitchAuth ? t.twitchLogout : t.twitchLoginHint;
+  btnTwitchLogin.classList.toggle('is-logged-in', twitchAuth !== null);
+}
+
+btnTwitchLogin?.addEventListener('click', () => {
+  if (twitchAuth) {
+    logout();
+    twitchAuth = null;
+    renderTwitchLogin();
+    return;
+  }
+  // Naar Twitch; Twitch stuurt ons terug met een token in de URL.
+  window.location.href = loginUrl();
+});
+
+/** Verwerkt een terugkeer van de Twitch-login. */
+async function handleTwitchReturn(): Promise<void> {
+  const hadToken = window.location.hash.includes('access_token=');
+  if (!hadToken) return;
+  const ok = await consumeTokenFromUrl();
+  if (ok) {
+    twitchAuth = loadAuth();
+    renderTwitchLogin();
+    // De embeds lezen de Twitch-cookies bij het laden: chat opnieuw opbouwen.
+    chat.reload();
+    toast(twitchAuth ? t.twitchLoggedIn(twitchAuth.login) : t.twitchLogin);
+  } else {
+    saveAuth(null);
+  }
 }
 
 /* ------------------------------ streams toevoegen ------------------------- */
@@ -721,9 +779,16 @@ Object.assign(window, {
     get lang() {
       return lang;
     },
+    get twitchAuth() {
+      return twitchAuth;
+    },
     changeLanguage,
+    loginUrl,
   },
 });
+
+// Terug van de Twitch-login? Token uit de URL halen en de chat verversen.
+void handleTwitchReturn();
 
 // Tijdens ontwikkeling: ?reset wist de opgeslagen streams.
 if (new URLSearchParams(window.location.search).has('reset')) {

@@ -106,6 +106,16 @@ export class ChatPanel {
     this.onChange();
   }
 
+  /**
+   * Bouwt alle embeds opnieuw op. Nodig na het inloggen: de embeds lezen de
+   * Twitch-sessie bij het laden.
+   */
+  reload(): void {
+    for (const frame of this.frames.values()) frame.remove();
+    this.frames.clear();
+    this.render();
+  }
+
   private render(): void {
     const body = this.root.querySelector('.chat-body') as HTMLElement;
     const empty = this.root.querySelector('.chat-empty') as HTMLElement;
@@ -135,7 +145,8 @@ export class ChatPanel {
   private createFrame(channel: string): HTMLIFrameElement {
     const frame = document.createElement('iframe');
     const host = window.location.hostname;
-    const params = new URLSearchParams({ parent: host });
+    // `darkpopout` laat Twitch het donkere thema gebruiken (zoals de Twitch-popout).
+    const params = new URLSearchParams({ parent: host, darkpopout: '' });
     frame.src = `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?${params}`;
     frame.className = 'chat-frame';
     frame.title = `Twitch chat: ${channel}`;
@@ -143,7 +154,6 @@ export class ChatPanel {
     frame.setAttribute('scrolling', 'no');
     return frame;
   }
-
   /**
    * Probeert het donkere thema in de Twitch-embed te zetten. Twitch gebruikt de
    * klassen `tw-root--theme-light` / `tw-root--theme-dark` op het <html>-element.

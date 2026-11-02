@@ -62,9 +62,20 @@ stream is behind: the viewer sees an older moment of the broadcast.
 ## Chat
 
 Every Twitch stream gets a tab in the chat panel, in the order you added the
-streams. Each tab is Twitch's own chat embed, so you are logged in with all the
-usual features (badges, replies, moderation, polls). The layout adapts to the
-number of streams:
+streams. Each tab is Twitch's own chat embed, so you are logged in exactly when
+your browser is logged in on twitch.tv — the app uses Twitch's own login (see
+below) or the session you already have there.
+
+**Login and theme.** Use **Settings → Twitch account** to log in with Twitch.
+The app never sees your password: Twitch redirects back with a token in the URL
+fragment, which is stored in your browser only. After logging in, the chat and
+the streams are logged in, just like on twitch.tv.
+
+The chat embed is opened with Twitch's `darkpopout` option, so it uses Twitch's
+dark theme regardless of your Twitch site setting. A page cannot restyle an
+iframe from another domain, so this is the only supported way to make it dark.
+
+The layout adapts to the number of streams:
 
 - **Even number of streams** – the chat sits in a sidebar next to the streams,
   like on Twitch itself.
@@ -74,13 +85,6 @@ number of streams:
 Clicking a stream (or its chat tab) makes it the active stream: it gets the
 sound and its chat is shown. Tabs keep their history while you switch between
 them.
-
-**Login and theme.** The chat is Twitch's own embed, so you are logged in exactly
-when your browser is logged in on twitch.tv — the app never sees your
-credentials. The embed follows your Twitch site setting, so switch Twitch to the
-dark theme (twitch.tv → Settings → Site → Dark) to match this app's look. A
-web page cannot restyle an iframe from another domain, so the app cannot force
-the theme itself.
 
 ## What is (not) possible
 
