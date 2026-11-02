@@ -8,14 +8,20 @@
  * token in de URL-fragment (#access_token=...), dat we direct uit de adresbalk
  * halen en alleen in deze browser bewaren.
  *
- * De client-ID is van de Twitch-webplayer (publiek, geen geheim). Wil je je
- * eigen app registreren, zet dan `VITE_TWITCH_CLIENT_ID` en voeg je
- * redirect-URI toe in de Twitch developer console.
+ * De client-ID is van JOUW eigen Twitch-app (dev.twitch.tv/console/apps).
+ * Zet hem als `VITE_TWITCH_CLIENT_ID` (bijv. via een GitHub-variable) en voeg
+ * de redirect-URI van je site toe in de Twitch-console — anders krijg je
+ * `redirect_mismatch`. Zonder eigen app werkt login alleen op twitch.tv zelf.
  */
 
-const CLIENT_ID = import.meta.env?.VITE_TWITCH_CLIENT_ID || 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+const CLIENT_ID = String(import.meta.env?.VITE_TWITCH_CLIENT_ID ?? '');
 const STORAGE_KEY = 'stream-syncer:twitch-auth';
 const SCOPES = ['chat:read', 'chat:edit', 'user:read:email'];
+
+/** Is er een client-ID geconfigureerd? Zonder kan inloggen niet werken. */
+export function hasClientId(): boolean {
+  return CLIENT_ID.length > 0;
+}
 
 export interface TwitchAuth {
   accessToken: string;
@@ -29,7 +35,8 @@ export function redirectUri(): string {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
-export function loginUrl(): string {
+export function loginUrl(): string | null {
+  if (!hasClientId()) return null;
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri(),

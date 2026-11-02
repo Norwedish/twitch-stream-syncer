@@ -518,7 +518,13 @@ btnTwitchLogin?.addEventListener('click', () => {
 
 /** Naar Twitch; Twitch stuurt ons terug met een token in de URL. */
 function startTwitchLogin(): void {
-  window.location.href = loginUrl();
+  const url = loginUrl();
+  if (!url) {
+    // Geen eigen Twitch-app geconfigureerd: login werkt dan alleen op twitch.tv.
+    toast(t.loginNotConfigured);
+    return;
+  }
+  window.location.href = url;
 }
 
 loginModalGo?.addEventListener('click', () => {

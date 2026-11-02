@@ -77,6 +77,7 @@ jobs:
         run: npm run build
         env:
           VITE_TWITCH_PROXY_ORIGIN: https://worker.norwelab.nl
+          VITE_TWITCH_CLIENT_ID: ${{ vars.TWITCH_CLIENT_ID }}
       - uses: actions/configure-pages@v5
         with:
           # Maakt GitHub Pages aan als dat nog niet gebeurd is.

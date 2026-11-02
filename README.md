@@ -71,12 +71,20 @@ a dialog offers to log in with Twitch and explains why (your own chat account,
 subscriptions/Turbo, no ads). You can close it and continue anonymously; it is
 shown once per browser. You can always log in later via **Settings → Twitch
 account**. The app never sees your password: Twitch redirects back with a token
-in the URL fragment, which is stored in your browser only. After logging in, the
-chat and the streams are logged in, just like on twitch.tv.
+in the URL fragment, which is stored in your browser only.
+
+For the login you need your own Twitch application (the redirect URI of your
+site must be registered there, otherwise Twitch returns `redirect_mismatch`):
+
+1. Go to <https://dev.twitch.tv/console/apps> → **Register Your Application**.
+2. Add your site as an OAuth redirect URL, exactly with trailing slash, e.g.
+   `http://localhost:5173/`, `https://norwedish.github.io/twitch-stream-syncer/`.
+3. Copy the Client ID and set it as the GitHub **variable** `TWITCH_CLIENT_ID`
+   (Settings → Secrets and variables → Actions → Variables). The build picks it
+   up as `VITE_TWITCH_CLIENT_ID`.
 
 The chat embed is opened with Twitch's `darkpopout` option, so it uses Twitch's
-dark theme regardless of your Twitch site setting. A page cannot restyle an
-iframe from another domain, so this is the only supported way to make it dark.
+dark theme regardless of your Twitch site setting.
 
 The layout adapts to the number of streams:
 
