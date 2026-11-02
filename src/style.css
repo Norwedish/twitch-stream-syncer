@@ -389,6 +389,15 @@ code {
   display: none;
 }
 
+/* Tot de Twitch-embed geladen is (en als het donkere thema niet lukt): donker. */
+.chat-body {
+  background: #18181b;
+}
+
+.chat-frame {
+  background: #18181b;
+}
+
 .chat-empty {
   flex: 1;
   display: flex;

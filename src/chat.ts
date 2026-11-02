@@ -1,9 +1,16 @@
 /**
  * Chatpaneel met tabs per stream.
  *
- * Elke tab is een echte Twitch-chat-embed (`www.twitch.tv/embed/<kanaal>/chat`),
- * dus met de ingelogde chat: moderatie, badges, replies, polls enzovoort. Een
- * eigen chatclient op het IRC-protocol kan dat niet.
+ * Elke tab is een echte Twitch-chat-embed (`www.twitch.tv/embed/<kanaal>/chat`).
+ * Die embed is een iframe van twitch.tv: hoe je daar bent ingelogd (of niet)
+ * bepaalt Twitch zelf via de cookies van twitch.tv in je browser. Wij kunnen
+ * daar niets aan toevoegen of aan veranderen — precies daarom is dit de echte
+ * chat en niet een zelfgebouwde client op het IRC-protocol.
+ *
+ * Het thema van de embed volgt de Twitch-site-instelling van de kijker. Omdat
+ * deze tool donker is, proberen we het donkere thema in de embed te zetten; dat
+ * mag de browser alleen als de embed dezelfde origin heeft, dus in de praktijk
+ * bepaalt Twitch het thema (Instellingen → Site → Donker thema).
  *
  * De embeds worden pas aangemaakt als een tab voor het eerst zichtbaar is, en
  * blijven daarna bestaan (verborgen), zodat de chatgeschiedenis bewaard blijft
@@ -20,6 +27,10 @@ export interface ChatTab {
 }
 
 export type ChatLayout = 'panel' | 'sidebar';
+
+/** Hoe vaak we het donkere thema in een embed proberen te zetten. */
+const THEME_RETRIES = 12;
+const THEME_RETRY_MS = 500;
 
 export class ChatPanel {
   private tabs: ChatTab[] = [];
@@ -109,12 +120,14 @@ export class ChatPanel {
 
     const active = this.tabs.find((t) => t.id === this.activeId);
     if (!active) return;
+
     // Embed pas aanmaken als de tab voor het eerst zichtbaar wordt.
     let frame = this.frames.get(active.id);
     if (!frame) {
       frame = this.createFrame(active.channel);
       this.frames.set(active.id, frame);
       body.appendChild(frame);
+      this.applyDarkTheme(frame);
     }
     for (const [id, f] of this.frames) f.hidden = id !== active.id;
   }
@@ -129,5 +142,37 @@ export class ChatPanel {
     frame.setAttribute('allow', 'clipboard-write');
     frame.setAttribute('scrolling', 'no');
     return frame;
+  }
+
+  /**
+   * Probeert het donkere thema in de Twitch-embed te zetten. Twitch gebruikt de
+   * klassen `tw-root--theme-light` / `tw-root--theme-dark` op het <html>-element.
+   *
+   * De embed is een iframe van twitch.tv: dat mag alleen als de pagina op
+   * twitch.tv draait. Op je eigen domein blokkeert de browser dit, en dan
+   * bepaalt de Twitch-site-instelling van de kijker het thema. We proberen het
+   * wel, zodat het werkt zodra dat wél kan.
+   */
+  private applyDarkTheme(frame: HTMLIFrameElement): void {
+    let attempts = 0;
+    const apply = () => {
+      attempts++;
+      let doc: Document | null = null;
+      try {
+        doc = frame.contentDocument;
+      } catch {
+        return; // Andere origin: niet toegestaan.
+      }
+      const root = doc?.documentElement;
+      if (!root) return;
+      root.classList.remove('tw-root--theme-light');
+      root.classList.add('tw-root--theme-dark');
+      if (attempts < THEME_RETRIES) window.setTimeout(apply, THEME_RETRY_MS);
+    };
+    frame.addEventListener('load', () => {
+      attempts = 0;
+      apply();
+    });
+    window.setTimeout(apply, THEME_RETRY_MS);
   }
 }

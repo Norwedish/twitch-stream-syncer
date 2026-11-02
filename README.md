@@ -75,6 +75,13 @@ Clicking a stream (or its chat tab) makes it the active stream: it gets the
 sound and its chat is shown. Tabs keep their history while you switch between
 them.
 
+**Login and theme.** The chat is Twitch's own embed, so you are logged in exactly
+when your browser is logged in on twitch.tv — the app never sees your
+credentials. The embed follows your Twitch site setting, so switch Twitch to the
+dark theme (twitch.tv → Settings → Site → Dark) to match this app's look. A
+web page cannot restyle an iframe from another domain, so the app cannot force
+the theme itself.
+
 ## What is (not) possible
 
 | Source | Latency measurement | Correction |
