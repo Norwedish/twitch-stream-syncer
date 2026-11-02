@@ -213,7 +213,7 @@ export class SyncEngine {
         <div class="card-actions">
           <button type="button" class="icon-btn" data-action="open-page" aria-label=""></button>
           <button type="button" class="icon-btn" data-action="focus" title="${this.escapeAttr(t.focus)}" aria-label="${this.escapeAttr(t.focus)}">${ICON_FOCUS}</button>
-          <button type="button" class="icon-btn" data-action="remove" title="${this.escapeAttr(t.remove)}" aria-label="${this.escapeAttr(t.remove)}">${ICON_TRASH}</button>
+          <button type="button" class="icon-btn icon-btn-danger" data-action="remove" title="${this.escapeAttr(t.remove)}" aria-label="${this.escapeAttr(t.remove)}">${ICON_TRASH}</button>
         </div>
         <div class="card-error" role="alert" hidden></div>
       `,
@@ -244,6 +244,7 @@ export class SyncEngine {
             <span class="offset-value" aria-live="off">0.0s</span>
             <button type="button" class="icon-btn tiny" data-action="offset-up" title="${this.escapeAttr(t.offsetLater)}" aria-label="${this.escapeAttr(t.offsetLater)}">+</button>
           </div>
+          <button type="button" class="icon-btn icon-btn-danger card-remove" data-action="remove" title="${this.escapeAttr(t.remove)}" aria-label="${this.escapeAttr(t.remove)}">${ICON_TRASH}</button>
         </div>
       </footer>
     `,
@@ -658,11 +659,13 @@ export class SyncEngine {
     card.classList.toggle('is-forced-anchor', v.config.forcedAnchor === true);
 
     const playing = v.adapter.isPlaying();
-    const state = v.userPaused ? t.statePaused : !playing ? t.stateBuffering : '';
+    const failed = v.status.error !== null;
+    const state = v.userPaused ? t.statePaused : failed ? t.stateOffline : !playing ? t.stateBuffering : '';
     stateBadge.hidden = state === '';
     stateBadge.textContent = state;
 
     card.dataset.playing = playing ? 'yes' : 'no';
+    card.dataset.failed = failed ? 'yes' : 'no';
     card.dataset.measured = v.latency !== null ? 'yes' : 'no';
 
     const latencyEl = card.querySelector<HTMLElement>('[data-stat="latency"]');

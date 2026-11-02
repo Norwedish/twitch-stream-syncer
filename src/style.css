@@ -574,6 +574,13 @@ code {
   transition: opacity 0.15s ease;
 }
 
+/* Altijd zichtbaar als de stream niet speelt of niet laadt: dan is dit de
+   enige bediening op de kaart. */
+.card[data-playing='no'] .card-actions,
+.card[data-failed='yes'] .card-actions {
+  opacity: 1;
+}
+
 .card:hover .card-actions,.card:focus-within .card-actions {
   opacity: 1;
 }
@@ -582,6 +589,15 @@ code {
   background: rgba(10, 10, 14, 0.72);
   backdrop-filter: blur(6px);
   color: var(--text);
+}
+
+.icon-btn-danger:hover {
+  background: rgba(255, 92, 122, 0.2);
+  color: var(--bad);
+}
+
+.card-remove {
+  margin-left: auto;
 }
 
 .card-error {
