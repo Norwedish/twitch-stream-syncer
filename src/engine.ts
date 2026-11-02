@@ -221,6 +221,7 @@ export class SyncEngine {
             <div class="card-offline-rings">
               <span></span><span></span><span></span>
             </div>
+            <div class="card-offline-glow"></div>
             <div class="card-offline-bars">
               <span></span><span></span><span></span><span></span><span></span>
             </div>

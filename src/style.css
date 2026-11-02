@@ -636,18 +636,30 @@ code {
   overflow: hidden;
 }
 
-/* Bewegende kleurgloed achter de scène. */
+/* Bewegende kleurgloed achter de scène. Twee lagen die tegengesteld draaien,
+   zodat de beweging eindeloos doorloopt zonder merkbare sprong. */
+.card-offline::before,
+.card-offline .card-offline-glow {
+  position: absolute;
+  inset: -60%;
+  z-index: -2;
+  filter: blur(30px);
+  will-change: transform;
+}
+
 .card-offline::before {
   content: '';
-  position: absolute;
-  inset: -40%;
-  z-index: -2;
   background:
     radial-gradient(closest-side at 30% 40%, rgba(145, 70, 255, 0.5), transparent 70%),
-    radial-gradient(closest-side at 70% 60%, rgba(95, 184, 255, 0.35), transparent 70%),
-    radial-gradient(closest-side at 50% 50%, rgba(255, 92, 122, 0.22), transparent 70%);
-  filter: blur(30px);
-  animation: offline-drift 18s ease-in-out infinite alternate;
+    radial-gradient(closest-side at 70% 60%, rgba(95, 184, 255, 0.35), transparent 70%);
+  animation: offline-spin 60s linear infinite;
+}
+
+.card-offline .card-offline-glow {
+  background:
+    radial-gradient(closest-side at 60% 35%, rgba(255, 92, 122, 0.22), transparent 70%),
+    radial-gradient(closest-side at 40% 65%, rgba(169, 112, 255, 0.28), transparent 70%);
+  animation: offline-spin-reverse 90s linear infinite;
 }
 
 /* Fijne scanlijnen voor een "tv"-gevoel. */
@@ -810,15 +822,22 @@ code {
   }
 }
 
-@keyframes offline-drift {
-  0% {
-    transform: translate3d(-6%, -4%, 0) scale(1);
+/* Volledige rondjes: begin- en eindstand zijn gelijk, dus geen sprong. */
+@keyframes offline-spin {
+  from {
+    transform: rotate(0deg) scale(1.05);
   }
-  50% {
-    transform: translate3d(4%, 6%, 0) scale(1.08);
+  to {
+    transform: rotate(360deg) scale(1.05);
   }
-  100% {
-    transform: translate3d(6%, -6%, 0) scale(1.03);
+}
+
+@keyframes offline-spin-reverse {
+  from {
+    transform: rotate(360deg) scale(1.1);
+  }
+  to {
+    transform: rotate(0deg) scale(1.1);
   }
 }
 
