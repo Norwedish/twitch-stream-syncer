@@ -3,6 +3,13 @@
   "name": "twitch-stream-syncer",
   "main": "worker/index.ts",
   "compatibility_date": "2026-01-01",
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
+    }
+  },
   "routes": [
     {
       "pattern": "worker.norwelab.nl",

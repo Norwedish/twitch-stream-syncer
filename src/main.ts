@@ -22,6 +22,7 @@ import {
   loadAuth,
   loginUrl,
   logout,
+  redirectUri,
   saveAuth,
   type TwitchAuth,
 } from './twitch-auth';
@@ -248,6 +249,7 @@ app.innerHTML = `
         <li data-i18n="loginReasonAds"></li>
       </ul>
       <p class="field-hint" data-i18n="loginPrivacy"></p>
+      <p class="field-hint login-redirect-hint"><span data-i18n="loginRedirectHint"></span> <code id="login-redirect-uri" translate="no"></code></p>
       <footer class="modal-foot">
         <button type="button" class="btn" data-close data-i18n="loginAnonymous"></button>
         <button type="button" class="btn btn-primary" id="login-modal-go" data-i18n="loginGo"></button>
@@ -268,6 +270,7 @@ const addModal = document.getElementById('add-modal') as HTMLDialogElement;
 const settingsModal = document.getElementById('settings-modal') as HTMLDialogElement;
 const loginModal = document.getElementById('login-modal') as HTMLDialogElement;
 const loginModalGo = document.getElementById('login-modal-go') as HTMLButtonElement;
+const loginRedirectUri = document.getElementById('login-redirect-uri') as HTMLElement;
 const addInput = document.getElementById('add-input') as HTMLTextAreaElement;
 const addError = document.getElementById('add-error') as HTMLElement;
 const toastEl = document.getElementById('toast') as HTMLElement;
@@ -468,6 +471,8 @@ function applyLanguage(): void {
   addHint.textContent = t.addHint;
   addHintEnd.textContent = t.addHintEnd;
   settingsTitle.textContent = t.settingsTitle;
+  // Laat in het loginvenster zien welke redirect-URI geregistreerd moet zijn.
+  if (loginRedirectUri) loginRedirectUri.textContent = redirectUri();
   renderTwitchLogin();
 
   // De opties van de taalkeuze hebben ook een vertaalde naam.
