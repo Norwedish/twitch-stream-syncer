@@ -182,18 +182,27 @@ On every push to `master`, `.github/workflows/deploy.yml` runs the tests, builds
 and deploys. Add the repository secrets `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` to enable that.
 
-### GitHub Pages (Twitch embed only)
+### GitHub Pages (app) + Cloudflare Worker (proxy)
 
-GitHub Pages can host the static build, but it cannot run the proxy. Twitch
-streams then play through the official embed (no exact latency, no seeking):
+De app is statisch te hosten; de Twitch-proxy draait apart op een Worker met een
+eigen domein (bijvoorbeeld `https://worker.norwelab.nl`). Zo kan de app op
+GitHub Pages staan en blijft de proxy werken.
 
-```bash
-VITE_TWITCH_PROXY=off npm run build
-```
+1. Zet in `wrangler.jsonc` je eigen domein onder `routes` (custom domain).
+2. Deploy de Worker: `npm run deploy`.
+3. Bouw de app met de proxy-URL:
 
-Publish `dist/` with your favourite Pages action (for example
-`actions/upload-pages-artifact` + `actions/deploy-pages`). HLS and MP4 streams
-work normally, as long as their server sends CORS headers.
+   ```bash
+   VITE_TWITCH_PROXY_ORIGIN=https://worker.norwelab.nl npm run build
+   ```
+
+4. Publiceer `dist/` op GitHub Pages. De workflow
+   `.github/workflows/deploy.yml` doet dit automatisch: hij zet
+   `VITE_TWITCH_PROXY_ORIGIN`, publiceert naar Pages en deployt de Worker
+   (als de secrets `CLOUDFLARE_API_TOKEN` en `CLOUDFLARE_ACCOUNT_ID` bestaan).
+
+Zonder `VITE_TWITCH_PROXY_ORIGIN` gebruikt de app de proxy op dezelfde origin
+(dev-server of de Worker zelf).
 
 ## Development
 
