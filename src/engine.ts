@@ -217,11 +217,21 @@ export class SyncEngine {
         </div>
         <div class="card-error" role="alert" hidden></div>
         <div class="card-offline" hidden>
-          <span class="card-offline-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 2v10h16V7H4Zm3.5 12h9v2h-9v-2Z"/></svg>
-          </span>
+          <div class="card-offline-scene" aria-hidden="true">
+            <div class="card-offline-rings">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="card-offline-bars">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="card-offline-mark">
+              <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 2v10h16V7H4Zm3.5 12h9v2h-9v-2Z"/></svg>
+              <span class="card-offline-slash"></span>
+            </div>
+          </div>
           <span class="card-offline-title"></span>
           <span class="card-offline-sub"></span>
+          <span class="card-offline-hint"></span>
         </div>
       `,
     );
@@ -740,8 +750,10 @@ export class SyncEngine {
       offline.hidden = !failed;
       const title = offline.querySelector<HTMLElement>('.card-offline-title');
       const sub = offline.querySelector<HTMLElement>('.card-offline-sub');
+      const hint = offline.querySelector<HTMLElement>('.card-offline-hint');
       if (title) title.textContent = v.config.label || v.config.ref;
       if (sub) sub.textContent = t.offlineHint;
+      if (hint) hint.textContent = t.offlineCheckBack;
       offline.title = v.status.error ?? '';
     }
     errorBox.hidden = true;

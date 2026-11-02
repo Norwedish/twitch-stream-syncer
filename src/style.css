@@ -627,24 +627,89 @@ code {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 20px;
+  gap: 6px;
+  padding: 16px;
   text-align: center;
-  background:
-    radial-gradient(600px 300px at 50% 0%, rgba(169, 112, 255, 0.14), transparent 70%),
-    #0e0e12;
+  background: #0b0b10;
   z-index: 1;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Bewegende kleurgloed achter de scène. */
+.card-offline::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  z-index: -2;
+  background:
+    radial-gradient(closest-side at 30% 40%, rgba(145, 70, 255, 0.5), transparent 70%),
+    radial-gradient(closest-side at 70% 60%, rgba(95, 184, 255, 0.35), transparent 70%),
+    radial-gradient(closest-side at 50% 50%, rgba(255, 92, 122, 0.22), transparent 70%);
+  filter: blur(30px);
+  animation: offline-drift 18s ease-in-out infinite alternate;
+}
+
+/* Fijne scanlijnen voor een "tv"-gevoel. */
+.card-offline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.035) 0px,
+    rgba(255, 255, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mask-image: radial-gradient(closest-side at 50% 50%, #000 60%, transparent 100%);
+  pointer-events: none;
 }
 
 .card-offline[hidden] {
   display: none;
 }
 
+.card-offline-scene {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+}
+
+/* Pulserende ringen ("signaal zoeken"). */
+.card-offline-rings {
+  position: absolute;
+  inset: 0;
+}
+
+.card-offline-rings span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(169, 112, 255, 0.55);
+  opacity: 0;
+  animation: offline-ring 3s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+.card-offline-rings span:nth-child(2) {
+  animation-delay: 1s;
+}
+
+.card-offline-rings span:nth-child(3) {
+  animation-delay: 2s;
+}
+
 .card-offline-mark {
-  width: 44px;
-  height: 44px;
-  color: var(--text-faint);
-  opacity: 0.9;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  color: #e7dcff;
+  filter: drop-shadow(0 0 10px rgba(169, 112, 255, 0.65));
+  animation: offline-flicker 4.5s steps(1, end) infinite;
 }
 
 .card-offline-mark svg {
@@ -652,19 +717,139 @@ code {
   height: 100%;
 }
 
+/* Het "geen signaal"-streepje over de tv. */
+.card-offline-slash {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 50%;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--bad), transparent);
+  transform: rotate(-20deg);
+  box-shadow: 0 0 10px rgba(255, 92, 122, 0.7);
+}
+
+/* Equalizer-balkjes onder de tv. */
+.card-offline-bars {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 14px;
+}
+
+.card-offline-bars span {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), rgba(169, 112, 255, 0.25));
+  transform-origin: bottom;
+  animation: offline-eq 1.2s ease-in-out infinite;
+}
+
+.card-offline-bars span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.card-offline-bars span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.card-offline-bars span:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+.card-offline-bars span:nth-child(5) {
+  animation-delay: 0.6s;
+}
+
 .card-offline-title {
-  font-weight: 600;
-  font-size: calc(15px * var(--font-scale));
-  color: var(--text);
+  font-weight: 700;
+  font-size: calc(16px * var(--font-scale));
+  letter-spacing: -0.2px;
+  color: #fff;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8);
 }
 
 .card-offline-sub {
   font-size: calc(12.5px * var(--font-scale));
-  color: var(--text-muted);
+  color: #cfc6e8;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
+}
+
+.card-offline-hint {
+  margin-top: 2px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(169, 112, 255, 0.35);
+  background: rgba(169, 112, 255, 0.12);
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: 0.3px;
+  color: #d9c2ff;
+}
+
+@keyframes offline-ring {
+  0% {
+    transform: scale(0.45);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes offline-drift {
+  0% {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, 6%, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(6%, -6%, 0) scale(1.03);
+  }
+}
+
+@keyframes offline-eq {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes offline-flicker {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.55;
+  }
+  94% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.7;
+  }
+  97% {
+    opacity: 1;
+  }
 }
 
 .card-footer {
