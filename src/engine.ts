@@ -2,7 +2,7 @@ import { createAdapter, type AdapterStatus, type StreamAdapter } from './adapter
 import type { Messages } from './i18n';
 import { buildSyncPlan, type SyncPlan, type SyncTuning } from './sync';
 import type { StreamConfig } from './sources';
-import { escapeHtml, formatDelta, formatLatency } from './ui-utils';
+import { formatDelta, formatLatency } from './ui-utils';
 
 export interface StreamView {
   config: StreamConfig;
@@ -196,7 +196,7 @@ export class SyncEngine {
     }
     card.querySelector('.card-footer')?.remove();
     // Oude bediening (overlay, acties, foutmelding) van een eerdere taal.
-    for (const el of card.querySelectorAll(':scope > .card-overlay, :scope > .card-actions, :scope > .card-error')) {
+    for (const el of card.querySelectorAll(':scope > .card-overlay, :scope > .card-actions, :scope > .card-error, :scope > .card-offline')) {
       el.remove();
     }
 
@@ -216,6 +216,13 @@ export class SyncEngine {
           <button type="button" class="icon-btn icon-btn-danger" data-action="remove" title="${this.escapeAttr(t.remove)}" aria-label="${this.escapeAttr(t.remove)}">${ICON_TRASH}</button>
         </div>
         <div class="card-error" role="alert" hidden></div>
+        <div class="card-offline" hidden>
+          <span class="card-offline-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 2v10h16V7H4Zm3.5 12h9v2h-9v-2Z"/></svg>
+          </span>
+          <span class="card-offline-title"></span>
+          <span class="card-offline-sub"></span>
+        </div>
       `,
     );
 
@@ -726,12 +733,19 @@ export class SyncEngine {
       offsetValue.textContent = `${v.config.offset > 0 ? '+' : ''}${v.config.offset.toFixed(1)}s`;
     }
 
-    if (v.status.error) {
-      errorBox.hidden = false;
-      errorBox.innerHTML = escapeHtml(v.status.error);
-    } else {
-      errorBox.hidden = true;
+    // Offline: een rustig "offline"-vlak in plaats van een technische fout.
+    // De fout zelf blijft beschikbaar als tooltip (en in de console).
+    const offline = card.querySelector<HTMLElement>('.card-offline');
+    if (offline) {
+      offline.hidden = !failed;
+      const title = offline.querySelector<HTMLElement>('.card-offline-title');
+      const sub = offline.querySelector<HTMLElement>('.card-offline-sub');
+      if (title) title.textContent = v.config.label || v.config.ref;
+      if (sub) sub.textContent = t.offlineHint;
+      offline.title = v.status.error ?? '';
     }
+    errorBox.hidden = true;
+    if (v.status.error) errorBox.dataset.message = v.status.error;
   }
 }
 
