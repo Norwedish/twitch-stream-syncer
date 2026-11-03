@@ -74,13 +74,6 @@ export interface StreamAdapter {
 const TIMELINE_REFRESH_MS = 5000;
 /** Hoeveel de live edge maximaal mag doorschuiven sinds de laatste playlist (ms). */
 const TIMELINE_MAX_EXTRAPOLATION_MS = 10000;
-/**
- * Groter verschil dan dit (ms) tussen spelerpositie en playlist = een echte
- * sprong (seek/herstart); kleiner = afronding of klokdrift.
- */
-const CALIBRATION_RESET_MS = 1500;
-/** Zo lang na een ijking beweegt de ijking niet mee (speler moet eerst rustig lopen). */
-const CALIBRATION_SETTLE_MS = 5000;
 
 const MAX_LATENCY = 3600;
 
@@ -105,16 +98,10 @@ class MediaAdapter implements StreamAdapter {
   protected playlistUrl: string | null = null;
   /** Laatste poging om de playlist op te halen. */
   protected lastLoadAttempt = 0;
-  /** IJking: wandklok-offset (ms) tussen media-tijd en de live edge. */
-  protected mediaOffset: number | null = null;
-  /** Media-tijd bij de laatste ijking (om stilstand te herkennen). */
-  protected lastCalibrationMedia = 0;
-  /** Tijdstip (ms) van de laatste ijking. */
-  protected lastCalibrationAt = 0;
-  /** Live edge (ms) waarop de ijking is gedaan. */
-  protected calibratedEdge = 0;
-  /** Media-tijd waarop de ijking is gedaan. */
-  protected mediaOrigin = 0;
+  /** Media-tijd die hoort bij startPosition (koppeling media-tijd -> playlistpositie). */
+  protected mediaOrigin: number | null = null;
+  /** Vorige startPosition, om vensterverschuivingen te detecteren. */
+  protected lastStartPosition = 0;
   /** Media-tijd bij de eerste meting; zo kennen we de positie van de speler. */
   protected mediaAnchor: number | null = null;
   private detail = '';
@@ -304,69 +291,31 @@ class MediaAdapter implements StreamAdapter {
   }
 
   /**
-   * De media-tijdlijn van hls.js begint niet altijd bij het begin van de
-   * playlist (Twitch hergebruikt de tijdlijn van de uitzending). Daarom ijken
-   * we: de positie die we kennen, gekoppeld aan de media-tijd.
-   *
-   * De ijking is het verschil tussen de wandklok van de spelerpositie en de
-   * live edge. Dat verschil is precies de latency van de speler. Het mag
-   * alleen veranderen bij een echte sprong (seek, herstart, langdurige hik);
-   * anders zou de latency nooit echt veranderen en kon de sync het verschil
-   * nooit wegwerken.
-   *
-   * Een nieuwe ijking mag daarom alleen bij een sprong, niet wanneer
-   * `startPosition` verschuift omdat er segmenten uit het venster vallen.
-   * Kleine afwijkingen middelen we uit, want de playlist-tijden zijn afgerond.
+   * Houd de koppeling tussen media-tijd (video.currentTime) en playlistpositie
+   * bij. hls.js gebruikt een doorlopende media-tijdlijn (bij Twitch loopt die
+   * door over de hele uitzending), terwijl `startPosition` de positie in het
+   * huidige playlistvenster is. Als het venster doorschuift, schuift
+   * startPosition mee; mediaOrigin schuift dan mee zodat de positie gelijk
+   * blijft. De latency volgt dan direct uit de playlist-tijden (PDT):
+   * latency = liveEdgeNow - wandklok(positie), zonder extra ijking — een
+   * extra offset zou de echte achterstand dubbel tellen.
    */
   private syncOffset(): void {
     if (this.mediaAnchor === null && this.video.currentTime > 0) this.mediaAnchor = this.video.currentTime;
-    if (!this.hls || !this.timeline) return;
+    if (!this.hls) return;
     const media = this.video.currentTime;
     if (!Number.isFinite(media) || media <= 0) return;
-    const position = this.hls.startPosition + (media - this.mediaOrigin);
-    const playerWall = this.playerWallAt(position);
-    if (playerWall === null) return;
-    const edge = this.liveEdgeNow();
-    if (edge === null) return;
-    const latency = (edge - playerWall) / 1000;
-    const plausible = latency >= -1 && latency <= 300;
-    if (this.mediaOffset === null) {
-      // Eerste ijking: de spelerpositie hoort bij de live edge.
-      if (!plausible) return;
-      this.mediaOffset = playerWall - edge;
-      this.calibratedEdge = edge;
+    if (this.mediaOrigin === null) {
       this.mediaOrigin = media;
-      this.lastCalibrationMedia = media;
-      this.lastCalibrationAt = Date.now();
+      this.lastStartPosition = this.hls.startPosition;
       return;
     }
-    // De speler staat stil (gepauzeerd of aan het bufferen): dan schuift de
-    // live edge door en zou de ijking ongemerkt verlopen. Niets doen.
-    const advanced = Math.abs(media - this.lastCalibrationMedia) > 0.05;
-    this.lastCalibrationMedia = media;
-    if (!advanced) return;
-    const deviation = playerWall - edge - this.mediaOffset;
-    if (Math.abs(deviation) > CALIBRATION_RESET_MS && plausible) {
-      // Echte sprong (seek, herstart, langdurige hik): opnieuw ijken.
-      this.mediaOffset = playerWall - edge;
-      this.calibratedEdge = edge;
-      this.mediaOrigin = media;
-      this.lastCalibrationAt = Date.now();
-      return;
+    const sp = this.hls.startPosition;
+    if (Number.isFinite(this.lastStartPosition) && Math.abs(sp - this.lastStartPosition) > 0.001) {
+      // Het playlistvenster is verschoven; media-tijd loopt gewoon door.
+      this.mediaOrigin += sp - this.lastStartPosition;
     }
-    // Kleine afwijking (afronding, klokdrift): langzaam meebewegen. Alleen als
-    // we net geijkt hebben; anders zou een hik van de speler (even stil, dan
-    // weer door) ongemerkt de ijking verschuiven en lijkt de stream ineens
-    // even langzaam of snel te lopen.
-    if (Date.now() - this.lastCalibrationAt > CALIBRATION_SETTLE_MS) {
-      this.mediaOffset += deviation * 0.02;
-    }
-    // De ijking hoort bij de live edge van de playlist waarop we hem deden.
-    // Komt er een nieuwe playlist binnen (de live edge schuift op), dan
-    // schuift de ijking mee: de wandklok van het beeld verandert daardoor
-    // niet. Anders zou de latency bij elke playlist-refresh verspringen.
-    this.mediaOffset -= edge - this.calibratedEdge;
-    this.calibratedEdge = edge;
+    this.lastStartPosition = sp;
   }
 
   /** Wandkloktijd (ms) van een positie in de playlist. */
@@ -388,22 +337,25 @@ class MediaAdapter implements StreamAdapter {
     return 0;
   }
 
+  /** Huidige playlistpositie van de speler (media-tijd -> playlistpositie). */
+  private currentPosition(): number | null {
+    const media = this.video.currentTime;
+    if (!Number.isFinite(media) || media <= 0) return null;
+    if (!this.hls) return media;
+    if (this.mediaOrigin === null) return null;
+    return this.hls.startPosition + (media - this.mediaOrigin);
+  }
+
   getLatency(): number | null {
     if (!this.canMeasure() || !this.timeline) return null;
-    const media = this.video.currentTime;
     const edge = this.liveEdgeNow();
-    if (!Number.isFinite(media) || media <= 0 || edge === null) return null;
-    if (this.hls && this.mediaOffset !== null) {
-      // Geijkt: media-tijd -> positie in de playlist -> wandklok.
-      const position = this.hls.startPosition + (media - this.mediaOrigin);
-      const wall = this.playerWallAt(position);
-      if (wall === null) return null;
-      const latency = (edge - (wall + this.mediaOffset)) / 1000;
-      return Number.isFinite(latency) ? Math.min(MAX_LATENCY, Math.max(0, latency)) : null;
-    }
-    // Nog niet geijkt: de media-tijd is de positie in de playlist.
-    const wall = this.playerWallAt(media);
+    if (edge === null) return null;
+    const position = this.currentPosition();
+    if (position === null) return null;
+    const wall = this.playerWallAt(position);
     if (wall === null) return null;
+    // Latency = live edge min de wandklok van het beeld dat nu te zien is.
+    // Geen extra offset: die zou de echte achterstand dubbel tellen.
     const latency = (edge - wall) / 1000;
     return Number.isFinite(latency) ? Math.min(MAX_LATENCY, Math.max(0, latency)) : null;
   }
@@ -433,8 +385,8 @@ class MediaAdapter implements StreamAdapter {
     const target = this.timeline.ends[this.timeline.ends.length - 1];
     const clamped = Math.min(target, Math.max(0, position));
     if (this.hls) {
-      // Media-tijd = startPosition + (positie - mediaOrigin) - mediaOffset.
-      const media = this.hls.startPosition + (clamped - this.mediaOrigin) - (this.mediaOffset ?? 0);
+      // Media-tijd = mediaOrigin + (positie - startPosition).
+      const media = (this.mediaOrigin ?? 0) + (clamped - this.hls.startPosition);
       const start = this.hls.startPosition;
       const end = start + target;
       if (media < start - 0.5 || media > end + 1) {

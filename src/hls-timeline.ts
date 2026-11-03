@@ -120,16 +120,10 @@ export function parseHlsPlaylist(text: string, url: string, fetchedAt = Date.now
   const lastWall = wallClocks[wallClocks.length - 1];
   const liveEdge = Number.isFinite(lastWall) ? lastWall + lastDuration * 1000 : lastPdt + lastDuration * 1000;
 
-  // Soms is de playlist ouder dan verwacht (CDN-cache, trage server). De live
-  // edge kan dan niet voor het ophaalmoment liggen; schuif de tijdlijn op.
-  // Grotere afwijkingen betekenen een VOD of een foutieve playlist: dan niet.
-  // De skew geldt voor de hele tijdlijn (ook de segmenten), anders zou de
-  // spelerpositie niet meer bij het einde van de playlist passen.
+  // Echte live edge op basis van PDT (betrouwbaar; X-SERVER-TIME in de
+  // DATERANGE-tags kan van een gecachte oudere playlist komen). De skew
+  // compenseert alleen een flink verouderde playlist (oude CDN-cache).
   const behind = fetchedAt - liveEdge;
-  // Twitch levert geen PDT en publiceert segmenten van 2 seconden; de playlist
-  // is dan bijna altijd iets ouder dan het laatste segment. Een kleine
-  // afwijking is dan de normale vertraging van de CDN, geen skew. Alleen een
-  // flinke achterstand (oude cache) schuiven we op.
   const skew =
     live && liveWindow && !estimated && behind > MIN_SKEW_MS && behind < MAX_SKEW_MS ? behind : 0;
   if (skew > 0) {
