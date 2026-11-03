@@ -1426,6 +1426,21 @@ textarea:focus-visible,input[type='number']:focus-visible {
   font-family: var(--mono);
 }
 
+.share-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+#share-link {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: calc(12px * var(--font-scale));
+}
+
 .switch-row,.field-row {
   display: grid;
   grid-template-columns: 1fr auto;

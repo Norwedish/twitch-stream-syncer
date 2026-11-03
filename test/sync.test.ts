@@ -125,8 +125,8 @@ test('meet het verschil in beeld, niet alleen in latency', () => {
   // Beide streams hebben dezelfde latency, maar tonen een ander moment.
   const plan = buildSyncPlan(
     [
-      input('a', 10, { playhead: 100 }),
-      input('b', 10, { playhead: 97 }),
+      input('a', 10, { playheadWall: 100_000 }),
+      input('b', 10, { playheadWall: 97_000 }),
     ],
     tuning,
     100,
@@ -140,8 +140,8 @@ test('meet het verschil in beeld, niet alleen in latency', () => {
 test('een onwaarschijnlijk groot verschil wordt niet gecorrigeerd', () => {
   const plan = buildSyncPlan(
     [
-      input('a', 10, { playhead: 100 }),
-      input('b', 10, { playhead: 100 - 60_000 }),
+      input('a', 10, { playheadWall: 100_000 }),
+      input('b', 10, { playheadWall: 100_000 - 60_000_000 }),
     ],
     tuning,
     100,
@@ -154,8 +154,8 @@ test('een onwaarschijnlijk groot verschil wordt niet gecorrigeerd', () => {
 test('een klein verschil binnen de dode zone blijft staan', () => {
   const plan = buildSyncPlan(
     [
-      input('a', 10, { playhead: 100 }),
-      input('b', 10, { playhead: 99.9 }),
+      input('a', 10, { playheadWall: 100_000 }),
+      input('b', 10, { playheadWall: 99_900 }),
     ],
     tuning,
     100,

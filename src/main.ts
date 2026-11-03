@@ -239,6 +239,23 @@ app.innerHTML = `
     </form>
   </dialog>
 
+  <dialog class="modal" id="share-modal" aria-labelledby="share-title">
+    <form method="dialog" class="modal-body">
+      <header class="modal-head">
+        <h2 id="share-title" data-i18n="shareTitle"></h2>
+        <button type="button" class="icon-btn" data-close>${ICON_CLOSE}</button>
+      </header>
+      <p class="field-hint" data-i18n="shareCopied"></p>
+      <div class="field-row share-row">
+        <input type="text" id="share-link" readonly />
+        <button type="button" class="btn" id="share-copy" data-i18n="shareCopy"></button>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn" data-close data-i18n="close"></button>
+      </footer>
+    </form>
+  </dialog>
+
   <dialog class="modal" id="login-modal" aria-labelledby="login-title">
     <div class="modal-body login-body">
       <header class="modal-head">
@@ -273,6 +290,8 @@ const statusEl = document.getElementById('sync-status') as HTMLElement;
 const addModal = document.getElementById('add-modal') as HTMLDialogElement;
 const settingsModal = document.getElementById('settings-modal') as HTMLDialogElement;
 const loginModal = document.getElementById('login-modal') as HTMLDialogElement;
+const shareModal = document.getElementById('share-modal') as HTMLDialogElement;
+const shareLinkInput = document.getElementById('share-link') as HTMLInputElement;
 const loginModalGo = document.getElementById('login-modal-go') as HTMLButtonElement;
 const loginRedirectUri = document.getElementById('login-redirect-uri') as HTMLElement;
 const addInput = document.getElementById('add-input') as HTMLTextAreaElement;
@@ -833,14 +852,35 @@ async function shareSetup(): Promise<void> {
     await navigator.clipboard.writeText(url);
     toast(t.shareToast);
   } catch {
-    // Geen klembordtoegang (bv. http): laat de link zien zodat je hem kunt
-    // kopiëren.
-    window.prompt(t.shareCopied, url);
+    // Geen klembordtoegang (bv. onveilig context): toon de link in een eigen
+    // venster. Nooit window.prompt() — die gooit in sommige contexten een
+    // fatal error.
+    showShareLink(url);
   }
+}
+
+/** Eigen venster met de deel-link (selecteerbaar, met kopieerknop). */
+function showShareLink(url: string): void {
+  shareLinkInput.value = url;
+  shareModal.showModal();
+  shareLinkInput.focus();
+  shareLinkInput.select();
 }
 
 btnShare.addEventListener('click', () => {
   void shareSetup();
+});
+
+document.getElementById('share-copy')?.addEventListener('click', async () => {
+  shareLinkInput.select();
+  try {
+    await navigator.clipboard.writeText(shareLinkInput.value);
+    toast(t.shareToast);
+  } catch {
+    // Klembord geblokkeerd: de link staat in het veld en is geselecteerd,
+    // Ctrl+C werkt dan handmatig.
+    document.execCommand('copy');
+  }
 });
 
 document.getElementById('add-form')?.addEventListener('submit', (event) => {

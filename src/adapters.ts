@@ -44,13 +44,13 @@ export interface StreamAdapter {
   /** Exacte latency in seconden, of null als niet meetbaar. */
   getLatency(): number | null;
   /**
-   * Beeldmoment in de uitzending (s sinds het begin van de playlist). Twee
-   * spelers met dezelfde waarde tonen hetzelfde moment. Null als de speler
-   * niet precies te meten is (embeds).
+   * Wandklok (ms) van het beeld dat nu te zien is. Twee spelers met
+   * dezelfde waarde tonen hetzelfde moment van de uitzending. Null als de
+   * speler niet precies te meten is (embeds).
    */
-  getPlayheadPosition?(): number | null;
-  /** Zet het beeld op een beeldmoment (s); alleen voor meetbare spelers. */
-  seekToPlayhead?(position: number): boolean;
+  getPlayheadWall?(): number | null;
+  /** Zet het beeld op een wandkloktijd (ms); alleen voor meetbare spelers. */
+  seekToWall?(wall: number): boolean;
   /** Positie in de gedeelde tijdlijn. */
   getPosition(): number;
   /**
@@ -102,6 +102,8 @@ class MediaAdapter implements StreamAdapter {
   protected mediaOrigin: number | null = null;
   /** Vorige startPosition, om vensterverschuivingen te detecteren. */
   protected lastStartPosition = 0;
+  /** Fragment dat nu speelt (heeft programDateTime = wandklok van het segment). */
+  protected currentFrag: { start: number; programDateTime?: number | null } | null = null;
   /** Media-tijd bij de eerste meting; zo kennen we de positie van de speler. */
   protected mediaAnchor: number | null = null;
   private detail = '';
@@ -179,6 +181,11 @@ class MediaAdapter implements StreamAdapter {
         this.updateDetail();
         void this.refreshTimeline(true);
       });
+      // Houd het fragment bij dat nu speelt: de PDT daarvan is de exacte
+      // wandklok van het beeld (betrouwbaarder dan media-tijd omrekenen).
+      hls.on(Hls.Events.FRAG_CHANGED, (_event, data) => {
+        this.currentFrag = data.frag;
+      });
       hls.attachMedia(this.video);
     } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari: native HLS.
@@ -238,8 +245,14 @@ class MediaAdapter implements StreamAdapter {
     this.lastFetch = now;
     try {
       // De tijdlijn moet van de echte (Twitch-)URL komen, niet van de proxy.
+      // DeFetchedAt is het moment VÓÓR de request; als de server even nodig
+      // heeft, is de playlist jonger dan fetchedAt. We meten daarom de
+      // round-trip en gebruiken het midden van de request als fetchedAt.
+      const startedAt = Date.now();
       const result = await fetchHlsTimeline(unproxifyTwitch(this.playlistUrl));
+      const fetchedAt = startedAt + (Date.now() - startedAt) / 2;
       if (result.timeline) {
+        result.timeline.fetchedAt = fetchedAt;
         this.timeline = result.timeline;
         this.timelineProblem = result.problem;
       } else {
@@ -249,6 +262,7 @@ class MediaAdapter implements StreamAdapter {
         if (proxied !== unproxifyTwitch(this.playlistUrl)) {
           const viaProxy = await fetchHlsTimeline(proxied);
           if (viaProxy.timeline) {
+            viaProxy.timeline.fetchedAt = fetchedAt;
             this.timeline = viaProxy.timeline;
             this.timelineProblem = viaProxy.problem;
           }
@@ -350,56 +364,65 @@ class MediaAdapter implements StreamAdapter {
     if (!this.canMeasure() || !this.timeline) return null;
     const edge = this.liveEdgeNow();
     if (edge === null) return null;
-    const position = this.currentPosition();
-    if (position === null) return null;
-    const wall = this.playerWallAt(position);
+    const wall = this.getPlayheadWall();
     if (wall === null) return null;
     // Latency = live edge min de wandklok van het beeld dat nu te zien is.
-    // Geen extra offset: die zou de echte achterstand dubbel tellen.
     const latency = (edge - wall) / 1000;
     return Number.isFinite(latency) ? Math.min(MAX_LATENCY, Math.max(0, latency)) : null;
   }
 
   /**
-   * Het beeldmoment in de uitzending, uitgedrukt in seconden sinds het begin
-   * van de playlist. Dit is bewust géén wandklok: de playlist-tijden van
-   * Twitch zijn niet altijd exact gelijk (afronding per kanaal), waardoor
-   * twee streams met hetzelfde beeld toch een verschillend "exact" moment
-   * kunnen hebben. Door naar het einde van de playlist te rekenen en de
-   * latency eraf te trekken, vergelijken we wat de kijker ziet.
+   * Wandklok (ms) van het beeld dat nu te zien is, uit de PDT van het fragment
+   * dat speelt. Dit is de betrouwbare ground truth: twee spelers met
+   * dezelfde waarde tonen hetzelfde moment van de uitzending.
    */
-  getPlayheadPosition(): number | null {
-    if (!this.timeline || !this.hls) return null;
-    const latency = this.getLatency();
-    if (latency === null) return null;
-    return this.timeline.ends[this.timeline.ends.length - 1] - latency;
+  getPlayheadWall(): number | null {
+    const frag = this.currentFrag;
+    const media = this.video.currentTime;
+    if (!Number.isFinite(media) || media <= 0) return null;
+    if (frag && Number.isFinite(frag.programDateTime)) {
+      return (frag.programDateTime as number) + (media - frag.start) * 1000;
+    }
+    // Nog geen fragment met PDT: val terug op de playlist-tijdlijn.
+    if (!this.timeline) return null;
+    const position = this.currentPosition();
+    if (position === null) return null;
+    return this.playerWallAt(position);
   }
 
   /**
-   * Zet het beeld op een positie in de playlist (s), zoals gemeten met
-   * `getPlayheadPosition`. Positief = verder in de uitzending (minder
-   * latency). Geeft true terug als de speler op de nieuwe positie staat.
+   * Zet het beeld op een wandkloktijd (ms), zoals gemeten met
+   * `getPlayheadWall`. We zoeken het segment met die PDT in het huidige
+   * playlistvenster en zetten currentTime daarop. Geeft true terug als de
+   * speler op de nieuwe positie staat.
    */
-  seekToPlayhead(position: number): boolean {
-    if (!this.timeline) return false;
-    const target = this.timeline.ends[this.timeline.ends.length - 1];
-    const clamped = Math.min(target, Math.max(0, position));
-    if (this.hls) {
-      // Media-tijd = mediaOrigin + (positie - startPosition).
-      const media = (this.mediaOrigin ?? 0) + (clamped - this.hls.startPosition);
-      const start = this.hls.startPosition;
-      const end = start + target;
-      if (media < start - 0.5 || media > end + 1) {
-        // Buiten het huidige venster: herlaad de playlist en probeer opnieuw.
-        this.hls.stopLoad();
-        this.hls.startLoad(Math.max(0, media));
-        window.setTimeout(() => this.seekToPlayhead(position), 500);
-        return false;
+  seekToWall(wall: number): boolean {
+    if (!this.timeline || !this.hls) return false;
+    const details = this.hls.latestLevelDetails ?? this.hls.levels[this.hls.currentLevel]?.details;
+    if (!details || !details.fragments) return false;
+    // Zoek het fragment waarvan de PDT bij de gevraagde wandklok hoort.
+    let target: (typeof details.fragments)[number] | null = null;
+    for (const frag of details.fragments) {
+      const pdt = frag.programDateTime;
+      if (pdt === null || pdt === undefined || !Number.isFinite(pdt)) continue;
+      const end = pdt + frag.duration * 1000;
+      if (wall >= pdt - 500 && wall <= end + 500) {
+        target = frag;
+        break;
       }
-      this.video.currentTime = Math.min(end - 0.1, Math.max(start, media));
-      return true;
     }
-    this.video.currentTime = Math.max(0, clamped);
+    if (!target || !Number.isFinite(target.programDateTime)) return false;
+    const media = target.start + Math.max(0, (wall - (target.programDateTime as number)) / 1000);
+    const start = target.start;
+    const end = target.start + target.duration;
+    if (media < start - 0.5 || media > end + 1) {
+      // Buiten het huidige venster: herlaad de playlist op die positie.
+      this.hls.stopLoad();
+      this.hls.startLoad(media);
+      window.setTimeout(() => this.seekToWall(wall), 500);
+      return false;
+    }
+    this.video.currentTime = Math.min(end - 0.1, Math.max(start, media));
     return true;
   }
 

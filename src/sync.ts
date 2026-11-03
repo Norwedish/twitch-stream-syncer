@@ -47,11 +47,11 @@ export interface SyncInput {
   /** Gemeten latency in seconden (alleen voor meetbare streams). */
   latency: number | null;
   /**
-   * Beeldmoment in de uitzending (s sinds het begin van de playlist). Alleen
-   * meetbaar voor streams met een exacte meting. Hiermee vergelijken we wat er
-   * écht te zien is, niet alleen hoeveel seconden een speler achterloopt.
+   * Beeldmoment in wandklok (ms): het moment van de uitzending dat nu te
+   * zien is. Twee spelers met dezelfde waarde tonen hetzelfde moment.
+   * Null als de speler niet precies te meten is (embeds).
    */
-  playhead?: number | null;
+  playheadWall?: number | null;
   /** Relatieve drift in seconden t.o.v. het moment van aansluiten. */
   drift: number;
   /** Speelt de speler op dit moment? */
@@ -75,10 +75,10 @@ export interface SyncMember extends SyncInput {
   /** Embed zonder exacte meting die te ver van de referentie zit om te corrigeren. */
   outOfRange: boolean;
   /**
-   * Beeldmoment (s) waarop deze stream moet staan: het beeld van de
+   * Wandkloktijd (ms) waarop deze stream moet staan: het beeld van de
    * referentie (plus de handmatige fijnafstelling). Null als niet meetbaar.
    */
-  targetPlayhead: number | null;
+  targetWall: number | null;
 }
 
 export interface SyncPlan {
@@ -173,10 +173,10 @@ export function buildSyncPlan(
   }
   const anchorPosition = anchor ? (positions.get(anchor.id) as number) : null;
 
-  // Het beeldmoment van de referentie: hier moeten alle meetbare streams
-  // staan. Dat is precieser dan de latency, want twee spelers met dezelfde
-  // latency kunnen toch een ander moment van de uitzending tonen.
-  const anchorPlayhead = anchor?.playhead ?? null;
+  // Het beeldmoment van de referentie (wandklok): hier moeten alle meetbare
+  // streams staan. Dat is precieser dan de latency, want twee spelers met
+  // dezelfde latency kunnen toch een ander moment van de uitzending tonen.
+  const anchorWall = anchor?.playheadWall ?? null;
 
   // Embeds zonder exacte meting kunnen niet seeken. Ze zijn alleen bruikbaar
   // als hun geschatte latency dicht bij de referentie zit; anders zouden ze
@@ -190,14 +190,14 @@ export function buildSyncPlan(
     const isEmbed = s.kind === 'twitch' || s.kind === 'youtube';
     // Het doelbeeldmoment van de referentie. De fijnafstelling zit al in de
     // positie van deze stream, dus niet nog eens toepassen.
-    const targetPlayhead = anchorPlayhead !== null && !isAnchor ? anchorPlayhead : null;
+    const targetWall = anchorWall !== null && !isAnchor ? anchorWall : null;
 
     // Het echte verschil: het beeld van deze stream tegenover dat van de
-    // referentie (positief = deze stream loopt achter). Alleen als beide
-    // spelers precies te meten zijn; anders het verschil in latency.
+    // referentie, in seconden (positief = deze stream loopt achter). Alleen
+    // als beide spelers precies te meten zijn; anders het verschil in latency.
     const measuredDelta =
-      s.playhead !== null && s.playhead !== undefined && targetPlayhead !== null
-        ? targetPlayhead - s.playhead
+      s.playheadWall !== null && s.playheadWall !== undefined && targetWall !== null
+        ? (targetWall - s.playheadWall) / 1000
         : target - position;
     // Een onwaarschijnlijk groot verschil is een meting die nog niet klopt
     // (speler net gestart, playlist nog niet geladen): dan niets doen.
@@ -224,7 +224,7 @@ export function buildSyncPlan(
       }
     }
 
-    return { ...s, position, target, delta, targetPlayhead, isAnchor, rate, needsRestart, outOfRange };
+    return { ...s, position, target, delta, targetWall, isAnchor, rate, needsRestart, outOfRange };
   });
 
   return {

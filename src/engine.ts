@@ -505,7 +505,7 @@ export class SyncEngine {
       id: v.config.id,
       kind: v.config.kind,
       latency: v.latency,
-      playhead: v.adapter.getPlayheadPosition?.() ?? null,
+      playheadWall: v.adapter.getPlayheadWall?.() ?? null,
       drift: v.drift,
       playing: v.adapter.isPlaying(),
       offset: v.config.offset,
@@ -581,7 +581,7 @@ export class SyncEngine {
         const cooldown = isEmbed ? EMBED_RECONNECT_COOLDOWN_MS : RESTART_COOLDOWN_MS;
         if (now - v.lastRestart > cooldown) {
           if (isEmbed) this.restartEmbed(v, member.target);
-          else this.restart(v, member.target, member.targetPlayhead);
+          else this.restart(v, member.target, member.targetWall);
         }
         continue;
       }
@@ -605,16 +605,16 @@ export class SyncEngine {
 
   /**
    * Zet een meetbare stream op het beeld van de referentie. Met
-   * `targetPlayhead` (beeldmoment) zoeken we hetzelfde moment in de playlist;
-   * zonder die tijd vallen we terug op de gedeelde positie.
+   * `targetWall` (wandkloktijd van het beeld) zoeken we hetzelfde moment in
+   * de playlist; zonder die tijd vallen we terug op de gedeelde positie.
    */
-  private restart(v: StreamView, position: number, targetPlayhead: number | null = null): void {
+  private restart(v: StreamView, position: number, targetWall: number | null = null): void {
     if (v.restartInFlight) return;
     v.lastRestart = performance.now();
     v.enginePaused = false;
     let moved = false;
-    if (targetPlayhead !== null && v.adapter.seekToPlayhead) {
-      moved = v.adapter.seekToPlayhead(targetPlayhead);
+    if (targetWall !== null && v.adapter.seekToWall) {
+      moved = v.adapter.seekToWall(targetWall);
     } else {
       v.adapter.seekTo(position);
       moved = true;

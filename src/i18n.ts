@@ -104,6 +104,7 @@ export interface Messages {
   shareToast: string;
   shareEmpty: string;
   shareCopied: string;
+  shareCopy: string;
   settings: string;
   emptyTitle: string;
   emptyText: string;
@@ -238,6 +239,7 @@ https://voorbeeld.nl/live/index.m3u8`,
   shareToast: 'Link gekopieerd naar het klembord',
   shareEmpty: 'Voeg eerst een stream toe.',
   shareCopied: 'De link staat op je klembord. Iedereen die hem opent, ziet dezelfde streams.',
+  shareCopy: 'Kopiëren',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} stream${added === 1 ? '' : 's'} toegevoegd`];
     if (skipped) parts.push(`${skipped} al aanwezig`);
@@ -367,6 +369,7 @@ https://example.com/live/index.m3u8`,
   shareToast: 'Link copied to the clipboard',
   shareEmpty: 'Add a stream first.',
   shareCopied: 'The link is on your clipboard. Anyone who opens it sees the same streams.',
+  shareCopy: 'Copy',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} stream${added === 1 ? '' : 's'} added`];
     if (skipped) parts.push(`${skipped} already present`);
@@ -496,6 +499,7 @@ https://beispiel.de/live/index.m3u8`,
   shareToast: 'Link in die Zwischenablage kopiert',
   shareEmpty: 'Füge zuerst einen Stream hinzu.',
   shareCopied: 'Der Link liegt in deiner Zwischenablage. Wer ihn öffnet, sieht dieselben Streams.',
+  shareCopy: 'Kopieren',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} Stream${added === 1 ? '' : 's'} hinzugefügt`];
     if (skipped) parts.push(`${skipped} bereits vorhanden`);
@@ -626,6 +630,7 @@ https://exemple.fr/live/index.m3u8`,
   shareToast: 'Lien copié dans le presse-papiers',
   shareEmpty: 'Ajoutez d’abord un flux.',
   shareCopied: 'Le lien est dans votre presse-papiers. Toute personne qui l’ouvre voit les mêmes flux.',
+  shareCopy: 'Copier',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} flux ajouté${added === 1 ? '' : 's'}`];
     if (skipped) parts.push(`${skipped} déjà présent${skipped === 1 ? '' : 's'}`);
@@ -756,6 +761,7 @@ https://ejemplo.es/live/index.m3u8`,
   shareToast: 'Enlace copiado al portapapeles',
   shareEmpty: 'Añade primero un stream.',
   shareCopied: 'El enlace está en tu portapapeles. Quien lo abra verá los mismos streams.',
+  shareCopy: 'Copiar',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} stream${added === 1 ? '' : 's'} añadido${added === 1 ? '' : 's'}`];
     if (skipped) parts.push(`${skipped} ya presente${skipped === 1 ? '' : 's'}`);
