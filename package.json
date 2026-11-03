@@ -1,7 +1,7 @@
 {
   "name": "twitch-stream-syncer",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Watch multiple live streams on one page, synced to the stream with the highest latency.",
   "scripts": {
