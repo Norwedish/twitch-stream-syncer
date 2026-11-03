@@ -102,8 +102,68 @@ test('past de handmatige offset toe', () => {
   const plan = buildSyncPlan([input('slow', 10), input('fast', 4, { offset: 2 })], tuning, 100);
   const fast = plan.members.find((m) => m.id === 'fast');
   assert(fast, 'fast ontbreekt');
-  // Referentie staat op 90, de snelle stream op 98 (96 + 2s offset): 8s voor.
-  close(fast.delta, -8, 'offset moet de positie verschuiven');
+  // Zonder offset loopt fast 6s voor (delta -6). +2s "later afspelen" moet
+  // dat verschuiven naar -4: het verschil verandert dus echt 2s.
+  close(fast.delta, -4, 'offset moet het verschil 2s verschuiven');
+});
+
+test('een negatieve offset zet een stream eerder', () => {
+  const plan = buildSyncPlan([input('slow', 10), input('fast', 4, { offset: -2 })], tuning, 100);
+  const fast = plan.members.find((m) => m.id === 'fast');
+  assert(fast, 'fast ontbreekt');
+  close(fast.delta, -8, 'de stream loopt 2s extra voor');
+});
+
+test('een offset op de referentie verschuift de andere streams mee', () => {
+  const plan = buildSyncPlan([input('slow', 10, { offset: 2 }), input('fast', 4)], tuning, 100);
+  const fast = plan.members.find((m) => m.id === 'fast');
+  assert(fast, 'fast ontbreekt');
+  close(fast.delta, -8, 'de andere stream volgt de referentie met zijn fijnafstelling');
+});
+
+test('meet het verschil in beeld, niet alleen in latency', () => {
+  // Beide streams hebben dezelfde latency, maar tonen een ander moment.
+  const plan = buildSyncPlan(
+    [
+      input('a', 10, { playhead: 100 }),
+      input('b', 10, { playhead: 97 }),
+    ],
+    tuning,
+    100,
+  );
+  const b = plan.members.find((m) => m.id === 'b');
+  assert(b, 'b ontbreekt');
+  close(b.delta, 3, 'b loopt 3s achter op het beeld van a');
+  assert(b.rate > 1, 'een achterlopende stream moet sneller gaan');
+});
+
+test('een onwaarschijnlijk groot verschil wordt niet gecorrigeerd', () => {
+  const plan = buildSyncPlan(
+    [
+      input('a', 10, { playhead: 100 }),
+      input('b', 10, { playhead: 100 - 60_000 }),
+    ],
+    tuning,
+    100,
+  );
+  const b = plan.members.find((m) => m.id === 'b');
+  assert(b, 'b ontbreekt');
+  assert(!b.needsRestart && b.rate === 1, 'meting klopt nog niet: niets doen');
+});
+
+test('een klein verschil binnen de dode zone blijft staan', () => {
+  const plan = buildSyncPlan(
+    [
+      input('a', 10, { playhead: 100 }),
+      input('b', 10, { playhead: 99.9 }),
+    ],
+    tuning,
+    100,
+  );
+  const b = plan.members.find((m) => m.id === 'b');
+  assert(b, 'b ontbreekt');
+  close(b.delta, 0, 'binnen de dode zone: geen correctie');
+  assert(b.rate === 1 && !b.needsRestart, 'geen snelheidswijziging');
 });
 
 const playlist = `#EXTM3U

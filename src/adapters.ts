@@ -43,6 +43,14 @@ export interface StreamAdapter {
   setVolume(volume: number): void;
   /** Exacte latency in seconden, of null als niet meetbaar. */
   getLatency(): number | null;
+  /**
+   * Beeldmoment in de uitzending (s sinds het begin van de playlist). Twee
+   * spelers met dezelfde waarde tonen hetzelfde moment. Null als de speler
+   * niet precies te meten is (embeds).
+   */
+  getPlayheadPosition?(): number | null;
+  /** Zet het beeld op een beeldmoment (s); alleen voor meetbare spelers. */
+  seekToPlayhead?(position: number): boolean;
   /** Positie in de gedeelde tijdlijn. */
   getPosition(): number;
   /**
@@ -66,6 +74,13 @@ export interface StreamAdapter {
 const TIMELINE_REFRESH_MS = 5000;
 /** Hoeveel de live edge maximaal mag doorschuiven sinds de laatste playlist (ms). */
 const TIMELINE_MAX_EXTRAPOLATION_MS = 10000;
+/**
+ * Groter verschil dan dit (ms) tussen spelerpositie en playlist = een echte
+ * sprong (seek/herstart); kleiner = afronding of klokdrift.
+ */
+const CALIBRATION_RESET_MS = 1500;
+/** Zo lang na een ijking beweegt de ijking niet mee (speler moet eerst rustig lopen). */
+const CALIBRATION_SETTLE_MS = 5000;
 
 const MAX_LATENCY = 3600;
 
@@ -90,8 +105,14 @@ class MediaAdapter implements StreamAdapter {
   protected playlistUrl: string | null = null;
   /** Laatste poging om de playlist op te halen. */
   protected lastLoadAttempt = 0;
-  /** IJking: wandklok-offset (ms) tussen media-tijd en de playlist. */
+  /** IJking: wandklok-offset (ms) tussen media-tijd en de live edge. */
   protected mediaOffset: number | null = null;
+  /** Media-tijd bij de laatste ijking (om stilstand te herkennen). */
+  protected lastCalibrationMedia = 0;
+  /** Tijdstip (ms) van de laatste ijking. */
+  protected lastCalibrationAt = 0;
+  /** Live edge (ms) waarop de ijking is gedaan. */
+  protected calibratedEdge = 0;
   /** Media-tijd waarop de ijking is gedaan. */
   protected mediaOrigin = 0;
   /** Media-tijd bij de eerste meting; zo kennen we de positie van de speler. */
@@ -284,11 +305,18 @@ class MediaAdapter implements StreamAdapter {
 
   /**
    * De media-tijdlijn van hls.js begint niet altijd bij het begin van de
-   * playlist (Twitch hergebruikt de tijdlijn van de uitzending). Daarom
-   * ijken we: de positie die we kennen, gekoppeld aan de media-tijd.
+   * playlist (Twitch hergebruikt de tijdlijn van de uitzending). Daarom ijken
+   * we: de positie die we kennen, gekoppeld aan de media-tijd.
    *
-   * Een nieuwe ijking mag alleen bij een echte sprong (seek), niet wanneer
+   * De ijking is het verschil tussen de wandklok van de spelerpositie en de
+   * live edge. Dat verschil is precies de latency van de speler. Het mag
+   * alleen veranderen bij een echte sprong (seek, herstart, langdurige hik);
+   * anders zou de latency nooit echt veranderen en kon de sync het verschil
+   * nooit wegwerken.
+   *
+   * Een nieuwe ijking mag daarom alleen bij een sprong, niet wanneer
    * `startPosition` verschuift omdat er segmenten uit het venster vallen.
+   * Kleine afwijkingen middelen we uit, want de playlist-tijden zijn afgerond.
    */
   private syncOffset(): void {
     if (this.mediaAnchor === null && this.video.currentTime > 0) this.mediaAnchor = this.video.currentTime;
@@ -298,19 +326,47 @@ class MediaAdapter implements StreamAdapter {
     const position = this.hls.startPosition + (media - this.mediaOrigin);
     const playerWall = this.playerWallAt(position);
     if (playerWall === null) return;
-    // De playlist is even geleden opgehaald; het einde is sindsdien opgeschoven.
     const edge = this.liveEdgeNow();
     if (edge === null) return;
     const latency = (edge - playerWall) / 1000;
-    if (this.mediaOffset === null || Math.abs(media - this.mediaOrigin) > 30 || latency < 0 || latency > 120) {
-      // (Opnieuw) ijken: de speler staat op het punt waar de playlist begint.
-      this.mediaOffset = playerWall - this.timeline.fetchedAt;
+    const plausible = latency >= -1 && latency <= 300;
+    if (this.mediaOffset === null) {
+      // Eerste ijking: de spelerpositie hoort bij de live edge.
+      if (!plausible) return;
+      this.mediaOffset = playerWall - edge;
+      this.calibratedEdge = edge;
       this.mediaOrigin = media;
+      this.lastCalibrationMedia = media;
+      this.lastCalibrationAt = Date.now();
       return;
     }
-    // Langzaam meebewegen met klokdrift.
-    const drift = playerWall - this.timeline.fetchedAt;
-    this.mediaOffset += (drift - this.mediaOffset) * 0.2;
+    // De speler staat stil (gepauzeerd of aan het bufferen): dan schuift de
+    // live edge door en zou de ijking ongemerkt verlopen. Niets doen.
+    const advanced = Math.abs(media - this.lastCalibrationMedia) > 0.05;
+    this.lastCalibrationMedia = media;
+    if (!advanced) return;
+    const deviation = playerWall - edge - this.mediaOffset;
+    if (Math.abs(deviation) > CALIBRATION_RESET_MS && plausible) {
+      // Echte sprong (seek, herstart, langdurige hik): opnieuw ijken.
+      this.mediaOffset = playerWall - edge;
+      this.calibratedEdge = edge;
+      this.mediaOrigin = media;
+      this.lastCalibrationAt = Date.now();
+      return;
+    }
+    // Kleine afwijking (afronding, klokdrift): langzaam meebewegen. Alleen als
+    // we net geijkt hebben; anders zou een hik van de speler (even stil, dan
+    // weer door) ongemerkt de ijking verschuiven en lijkt de stream ineens
+    // even langzaam of snel te lopen.
+    if (Date.now() - this.lastCalibrationAt > CALIBRATION_SETTLE_MS) {
+      this.mediaOffset += deviation * 0.02;
+    }
+    // De ijking hoort bij de live edge van de playlist waarop we hem deden.
+    // Komt er een nieuwe playlist binnen (de live edge schuift op), dan
+    // schuift de ijking mee: de wandklok van het beeld verandert daardoor
+    // niet. Anders zou de latency bij elke playlist-refresh verspringen.
+    this.mediaOffset -= edge - this.calibratedEdge;
+    this.calibratedEdge = edge;
   }
 
   /** Wandkloktijd (ms) van een positie in de playlist. */
@@ -350,6 +406,49 @@ class MediaAdapter implements StreamAdapter {
     if (wall === null) return null;
     const latency = (edge - wall) / 1000;
     return Number.isFinite(latency) ? Math.min(MAX_LATENCY, Math.max(0, latency)) : null;
+  }
+
+  /**
+   * Het beeldmoment in de uitzending, uitgedrukt in seconden sinds het begin
+   * van de playlist. Dit is bewust géén wandklok: de playlist-tijden van
+   * Twitch zijn niet altijd exact gelijk (afronding per kanaal), waardoor
+   * twee streams met hetzelfde beeld toch een verschillend "exact" moment
+   * kunnen hebben. Door naar het einde van de playlist te rekenen en de
+   * latency eraf te trekken, vergelijken we wat de kijker ziet.
+   */
+  getPlayheadPosition(): number | null {
+    if (!this.timeline || !this.hls) return null;
+    const latency = this.getLatency();
+    if (latency === null) return null;
+    return this.timeline.ends[this.timeline.ends.length - 1] - latency;
+  }
+
+  /**
+   * Zet het beeld op een positie in de playlist (s), zoals gemeten met
+   * `getPlayheadPosition`. Positief = verder in de uitzending (minder
+   * latency). Geeft true terug als de speler op de nieuwe positie staat.
+   */
+  seekToPlayhead(position: number): boolean {
+    if (!this.timeline) return false;
+    const target = this.timeline.ends[this.timeline.ends.length - 1];
+    const clamped = Math.min(target, Math.max(0, position));
+    if (this.hls) {
+      // Media-tijd = startPosition + (positie - mediaOrigin) - mediaOffset.
+      const media = this.hls.startPosition + (clamped - this.mediaOrigin) - (this.mediaOffset ?? 0);
+      const start = this.hls.startPosition;
+      const end = start + target;
+      if (media < start - 0.5 || media > end + 1) {
+        // Buiten het huidige venster: herlaad de playlist en probeer opnieuw.
+        this.hls.stopLoad();
+        this.hls.startLoad(Math.max(0, media));
+        window.setTimeout(() => this.seekToPlayhead(position), 500);
+        return false;
+      }
+      this.video.currentTime = Math.min(end - 0.1, Math.max(start, media));
+      return true;
+    }
+    this.video.currentTime = Math.max(0, clamped);
+    return true;
   }
 
   onTimelineShift(shift: number): void {

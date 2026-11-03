@@ -22,6 +22,8 @@ export interface HlsTimeline {
   wallClocks: number[];
   /** Einde van het nieuwste segment (ms). */
   liveEdge: number;
+  /** Wandkloktijd (ms) van het einde van het nieuwste segment, zonder skew. */
+  endWall: number;
   live: boolean;
   /** True als de tijden geschat zijn (geen PDT en geen timestamp-map). */
   estimated: boolean;
@@ -40,6 +42,8 @@ interface TimestampMap {
 
 /** Grotere afwijking dan dit betekent een VOD of een foutieve playlist. */
 const MAX_SKEW_MS = 120_000;
+/** Kleinere achterstand dan dit is normale CDN-vertraging, geen oude cache. */
+const MIN_SKEW_MS = 15_000;
 /** Een live playlist heeft een kort venster; langer = VOD. */
 const MAX_LIVE_WINDOW_S = 300;
 
@@ -119,8 +123,23 @@ export function parseHlsPlaylist(text: string, url: string, fetchedAt = Date.now
   // Soms is de playlist ouder dan verwacht (CDN-cache, trage server). De live
   // edge kan dan niet voor het ophaalmoment liggen; schuif de tijdlijn op.
   // Grotere afwijkingen betekenen een VOD of een foutieve playlist: dan niet.
+  // De skew geldt voor de hele tijdlijn (ook de segmenten), anders zou de
+  // spelerpositie niet meer bij het einde van de playlist passen.
   const behind = fetchedAt - liveEdge;
-  const skew = live && liveWindow && !estimated && behind > 0 && behind < MAX_SKEW_MS ? behind : 0;
+  // Twitch levert geen PDT en publiceert segmenten van 2 seconden; de playlist
+  // is dan bijna altijd iets ouder dan het laatste segment. Een kleine
+  // afwijking is dan de normale vertraging van de CDN, geen skew. Alleen een
+  // flinke achterstand (oude cache) schuiven we op.
+  const skew =
+    live && liveWindow && !estimated && behind > MIN_SKEW_MS && behind < MAX_SKEW_MS ? behind : 0;
+  if (skew > 0) {
+    for (let i = 0; i < wallClocks.length; i++) wallClocks[i] += skew;
+  }
+
+  // Wandkloktijd van het einde van de playlist. `liveEdge` is de geschatte
+  // live edge; `endWall` is het einde van het nieuwste segment zelf en wordt
+  // gebruikt om de spelerpositie te ijken.
+  const endWall = (Number.isFinite(lastWall) ? lastWall : lastPdt) + lastDuration * 1000 + skew;
 
   return {
     timeline: {
@@ -130,6 +149,7 @@ export function parseHlsPlaylist(text: string, url: string, fetchedAt = Date.now
       ends,
       wallClocks,
       liveEdge: liveEdge + skew,
+      endWall,
       live,
       estimated,
     },

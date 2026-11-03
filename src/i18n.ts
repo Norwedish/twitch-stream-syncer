@@ -99,6 +99,11 @@ export interface Messages {
   resyncTitle: string;
   resyncToast: string;
   addStreams: string;
+  share: string;
+  shareTitle: string;
+  shareToast: string;
+  shareEmpty: string;
+  shareCopied: string;
   settings: string;
   emptyTitle: string;
   emptyText: string;
@@ -228,6 +233,11 @@ https://voorbeeld.nl/live/index.m3u8`,
   add: 'Toevoegen',
   addNoValid: (errors) => `Geen geldige streams gevonden: ${errors}`,
   addEmpty: 'Plak minstens één stream.',
+  share: 'Delen',
+  shareTitle: 'Deel deze multistream',
+  shareToast: 'Link gekopieerd naar het klembord',
+  shareEmpty: 'Voeg eerst een stream toe.',
+  shareCopied: 'De link staat op je klembord. Iedereen die hem opent, ziet dezelfde streams.',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} stream${added === 1 ? '' : 's'} toegevoegd`];
     if (skipped) parts.push(`${skipped} al aanwezig`);
@@ -352,6 +362,11 @@ https://example.com/live/index.m3u8`,
   add: 'Add',
   addNoValid: (errors) => `No valid streams found: ${errors}`,
   addEmpty: 'Paste at least one stream.',
+  share: 'Share',
+  shareTitle: 'Share this multistream',
+  shareToast: 'Link copied to the clipboard',
+  shareEmpty: 'Add a stream first.',
+  shareCopied: 'The link is on your clipboard. Anyone who opens it sees the same streams.',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} stream${added === 1 ? '' : 's'} added`];
     if (skipped) parts.push(`${skipped} already present`);
@@ -476,6 +491,11 @@ https://beispiel.de/live/index.m3u8`,
   add: 'Hinzufügen',
   addNoValid: (errors) => `Keine gültigen Streams gefunden: ${errors}`,
   addEmpty: 'Füge mindestens einen Stream ein.',
+  share: 'Teilen',
+  shareTitle: 'Diesen Multistream teilen',
+  shareToast: 'Link in die Zwischenablage kopiert',
+  shareEmpty: 'Füge zuerst einen Stream hinzu.',
+  shareCopied: 'Der Link liegt in deiner Zwischenablage. Wer ihn öffnet, sieht dieselben Streams.',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} Stream${added === 1 ? '' : 's'} hinzugefügt`];
     if (skipped) parts.push(`${skipped} bereits vorhanden`);
@@ -601,6 +621,11 @@ https://exemple.fr/live/index.m3u8`,
   add: 'Ajouter',
   addNoValid: (errors) => `Aucun flux valide trouvé : ${errors}`,
   addEmpty: 'Collez au moins un flux.',
+  share: 'Partager',
+  shareTitle: 'Partager ce multistream',
+  shareToast: 'Lien copié dans le presse-papiers',
+  shareEmpty: 'Ajoutez d’abord un flux.',
+  shareCopied: 'Le lien est dans votre presse-papiers. Toute personne qui l’ouvre voit les mêmes flux.',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} flux ajouté${added === 1 ? '' : 's'}`];
     if (skipped) parts.push(`${skipped} déjà présent${skipped === 1 ? '' : 's'}`);
@@ -726,6 +751,11 @@ https://ejemplo.es/live/index.m3u8`,
   add: 'Añadir',
   addNoValid: (errors) => `No se han encontrado streams válidos: ${errors}`,
   addEmpty: 'Pega al menos un stream.',
+  share: 'Compartir',
+  shareTitle: 'Compartir este multistream',
+  shareToast: 'Enlace copiado al portapapeles',
+  shareEmpty: 'Añade primero un stream.',
+  shareCopied: 'El enlace está en tu portapapeles. Quien lo abra verá los mismos streams.',
   addedToast: (added, skipped, errors) => {
     const parts = [`${added} stream${added === 1 ? '' : 's'} añadido${added === 1 ? '' : 's'}`];
     if (skipped) parts.push(`${skipped} ya presente${skipped === 1 ? '' : 's'}`);

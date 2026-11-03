@@ -46,6 +46,12 @@ export interface SyncInput {
   kind: SourceKind;
   /** Gemeten latency in seconden (alleen voor meetbare streams). */
   latency: number | null;
+  /**
+   * Beeldmoment in de uitzending (s sinds het begin van de playlist). Alleen
+   * meetbaar voor streams met een exacte meting. Hiermee vergelijken we wat er
+   * écht te zien is, niet alleen hoeveel seconden een speler achterloopt.
+   */
+  playhead?: number | null;
   /** Relatieve drift in seconden t.o.v. het moment van aansluiten. */
   drift: number;
   /** Speelt de speler op dit moment? */
@@ -68,6 +74,11 @@ export interface SyncMember extends SyncInput {
   needsRestart: boolean;
   /** Embed zonder exacte meting die te ver van de referentie zit om te corrigeren. */
   outOfRange: boolean;
+  /**
+   * Beeldmoment (s) waarop deze stream moet staan: het beeld van de
+   * referentie (plus de handmatige fijnafstelling). Null als niet meetbaar.
+   */
+  targetPlayhead: number | null;
 }
 
 export interface SyncPlan {
@@ -94,6 +105,12 @@ const RATE_MAX = 1.15;
 const RATE_GAIN = 0.2;
 /** Kleiner verschil dan dit: niets doen. */
 const RESTART_DEADBAND = 0.15;
+/**
+ * Groter verschil dan dit (s) tussen twee spelers is geen echte achterstand
+ * maar een meting die nog niet klopt (bv. een speler die net begint). Dan
+ * wachten we, in plaats van de stream eindeloos te herstarten.
+ */
+const MAX_PLAUSIBLE_DELTA = 300;
 
 /**
  * Kiest de referentie. `previousAnchorId` wordt vastgehouden zolang geen andere
@@ -148,10 +165,18 @@ export function buildSyncPlan(
   const positions = new Map<string, number>();
   for (const s of inputs) {
     const latency = s.latency ?? fallbackLatency + s.drift + forcedDrift;
-    positions.set(s.id, maxLatencyCap - latency + tuning.safetyMargin + s.offset);
+    // De fijnafstelling zit in de positie: een positieve waarde betekent
+    // "deze stream later" (dus minder latency). Verderop rekenen we alleen
+    // nog met deze positie, zodat de offset niet dubbel telt.
+    const position = maxLatencyCap - latency - s.offset + tuning.safetyMargin;
+    positions.set(s.id, position);
   }
-
   const anchorPosition = anchor ? (positions.get(anchor.id) as number) : null;
+
+  // Het beeldmoment van de referentie: hier moeten alle meetbare streams
+  // staan. Dat is precieser dan de latency, want twee spelers met dezelfde
+  // latency kunnen toch een ander moment van de uitzending tonen.
+  const anchorPlayhead = anchor?.playhead ?? null;
 
   // Embeds zonder exacte meting kunnen niet seeken. Ze zijn alleen bruikbaar
   // als hun geschatte latency dicht bij de referentie zit; anders zouden ze
@@ -161,10 +186,27 @@ export function buildSyncPlan(
   const members: SyncMember[] = inputs.map((s) => {
     const position = positions.get(s.id) as number;
     const target = anchorPosition ?? position;
-    const delta = target - position;
     const isAnchor = anchor?.id === s.id;
     const isEmbed = s.kind === 'twitch' || s.kind === 'youtube';
-    const outOfRange = isEmbed && anchor !== null && Math.abs(delta) > embedTolerance;
+    // Het doelbeeldmoment van de referentie. De fijnafstelling zit al in de
+    // positie van deze stream, dus niet nog eens toepassen.
+    const targetPlayhead = anchorPlayhead !== null && !isAnchor ? anchorPlayhead : null;
+
+    // Het echte verschil: het beeld van deze stream tegenover dat van de
+    // referentie (positief = deze stream loopt achter). Alleen als beide
+    // spelers precies te meten zijn; anders het verschil in latency.
+    const measuredDelta =
+      s.playhead !== null && s.playhead !== undefined && targetPlayhead !== null
+        ? targetPlayhead - s.playhead
+        : target - position;
+    // Een onwaarschijnlijk groot verschil is een meting die nog niet klopt
+    // (speler net gestart, playlist nog niet geladen): dan niets doen.
+    let delta = isAnchor || !Number.isFinite(measuredDelta) ? 0 : measuredDelta;
+    // Binnen de dode zone (afronding van de playlist, kleine klokverschillen)
+    // telt het verschil als nul: anders blijven de snelheden eeuwig wiebelen.
+    if (Math.abs(delta) <= RESTART_DEADBAND) delta = 0;
+    const outOfRange =
+      (isEmbed && anchor !== null && Math.abs(delta) > embedTolerance) || Math.abs(delta) > MAX_PLAUSIBLE_DELTA;
 
     let rate = 1;
     let needsRestart = false;
@@ -175,14 +217,14 @@ export function buildSyncPlan(
           needsRestart = true;
         } else {
           // Nooit pauzeren: een stream die voorloopt loopt rustig langzamer
-          // (tot 0.5x) tot hij bij de referentie is. Dat is veel minder
+          // (tot 0.85x) tot hij bij de referentie is. Dat is veel minder
           // storend dan steeds pauzeren en weer starten.
           rate = Math.min(RATE_MAX, Math.max(RATE_MIN, 1 + delta * RATE_GAIN));
         }
       }
     }
 
-    return { ...s, position, target, delta, isAnchor, rate, needsRestart, outOfRange };
+    return { ...s, position, target, delta, targetPlayhead, isAnchor, rate, needsRestart, outOfRange };
   });
 
   return {

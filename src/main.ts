@@ -130,6 +130,7 @@ app.innerHTML = `
       <button type="button" class="btn" id="btn-play"></button>
       <button type="button" class="btn" id="btn-pause"></button>
       <button type="button" class="btn" id="btn-resync"></button>
+      <button type="button" class="btn" id="btn-share"></button>
       <button type="button" class="btn btn-primary" id="btn-add"></button>
       <button type="button" class="icon-btn" id="btn-settings" aria-label="">${ICON_SETTINGS}</button>
     </div>
@@ -278,6 +279,7 @@ const toastEl = document.getElementById('toast') as HTMLElement;
 const btnPlay = document.getElementById('btn-play') as HTMLButtonElement;
 const btnPause = document.getElementById('btn-pause') as HTMLButtonElement;
 const btnResync = document.getElementById('btn-resync') as HTMLButtonElement;
+const btnShare = document.getElementById('btn-share') as HTMLButtonElement;
 const btnAdd = document.getElementById('btn-add') as HTMLButtonElement;
 const btnSettings = document.getElementById('btn-settings') as HTMLButtonElement;
 const emptyTitle = emptyState.querySelector('h1') as HTMLElement;
@@ -534,6 +536,8 @@ function applyLanguage(): void {
   btnPause.title = t.pauseTitle;
   btnResync.textContent = t.resync;
   btnResync.title = t.resyncTitle;
+  btnShare.textContent = t.share;
+  btnShare.title = t.shareTitle;
   btnAdd.textContent = t.addStreams;
   btnSettings.title = t.settings;
   btnSettings.setAttribute('aria-label', t.settings);
@@ -792,6 +796,50 @@ btnPause.addEventListener('click', () => engine.pauseAll());
 btnResync.addEventListener('click', () => {
   engine.resync();
   toast(t.resyncToast);
+});
+
+/* ---------------------------------- delen --------------------------------- */
+
+/**
+ * Deelbare link: dezelfde streams, in dezelfde volgorde, via de bestaande
+ * URL-import (`/addstreams?kanaal+kanaal`). Iemand die de link opent, krijgt
+ * precies deze multistream.
+ */
+function shareUrl(): string | null {
+  if (streams.length === 0) return null;
+  const url = new URL('/addstreams', window.location.origin);
+  url.search = streams.map((s) => s.ref).join('+');
+  return url.toString();
+}
+
+async function shareSetup(): Promise<void> {
+  const url = shareUrl();
+  if (!url) {
+    toast(t.shareEmpty);
+    return;
+  }
+  // Op telefoons liever het systeemdeelvenster; op de desktop het klembord.
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: t.shareTitle, url });
+      return;
+    } catch (error) {
+      // Geannuleerd of niet toegestaan: dan gewoon naar het klembord.
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast(t.shareToast);
+  } catch {
+    // Geen klembordtoegang (bv. http): laat de link zien zodat je hem kunt
+    // kopiëren.
+    window.prompt(t.shareCopied, url);
+  }
+}
+
+btnShare.addEventListener('click', () => {
+  void shareSetup();
 });
 
 document.getElementById('add-form')?.addEventListener('submit', (event) => {

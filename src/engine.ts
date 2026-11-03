@@ -505,6 +505,7 @@ export class SyncEngine {
       id: v.config.id,
       kind: v.config.kind,
       latency: v.latency,
+      playhead: v.adapter.getPlayheadPosition?.() ?? null,
       drift: v.drift,
       playing: v.adapter.isPlaying(),
       offset: v.config.offset,
@@ -580,7 +581,7 @@ export class SyncEngine {
         const cooldown = isEmbed ? EMBED_RECONNECT_COOLDOWN_MS : RESTART_COOLDOWN_MS;
         if (now - v.lastRestart > cooldown) {
           if (isEmbed) this.restartEmbed(v, member.target);
-          else this.restart(v, member.target);
+          else this.restart(v, member.target, member.targetPlayhead);
         }
         continue;
       }
@@ -602,12 +603,27 @@ export class SyncEngine {
     this.callbacks.onTick(views, plan);
   }
 
-  private restart(v: StreamView, position: number): void {
+  /**
+   * Zet een meetbare stream op het beeld van de referentie. Met
+   * `targetPlayhead` (beeldmoment) zoeken we hetzelfde moment in de playlist;
+   * zonder die tijd vallen we terug op de gedeelde positie.
+   */
+  private restart(v: StreamView, position: number, targetPlayhead: number | null = null): void {
     if (v.restartInFlight) return;
-    v.restartInFlight = true;
     v.lastRestart = performance.now();
     v.enginePaused = false;
-    v.adapter.seekTo(position);
+    let moved = false;
+    if (targetPlayhead !== null && v.adapter.seekToPlayhead) {
+      moved = v.adapter.seekToPlayhead(targetPlayhead);
+    } else {
+      v.adapter.seekTo(position);
+      moved = true;
+    }
+    // Buiten het venster van de playlist: de speler herlaadt en probeert het
+    // zelf opnieuw. Dan niet meteen als "bezig" markeren, zodat de volgende
+    // tick het opnieuw kan proberen.
+    if (!moved) return;
+    v.restartInFlight = true;
     window.setTimeout(() => {
       v.restartInFlight = false;
       if (!v.userPaused) void v.adapter.play();
