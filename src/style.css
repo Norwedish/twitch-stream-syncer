@@ -1415,7 +1415,15 @@ textarea:focus-visible,input[type='number']:focus-visible {
 .modal-foot {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
+}
+
+.version-badge {
+  margin-right: auto;
+  color: var(--text-faint);
+  font-size: calc(11.5px * var(--font-scale));
+  font-family: var(--mono);
 }
 
 .switch-row,.field-row {

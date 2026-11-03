@@ -14,6 +14,7 @@ import {
 } from './i18n';
 import { parseImportSearch, parseSourceList } from './import';
 import { parseSource, type StreamConfig } from './sources';
+import { APP_VERSION } from './version';
 import { DEFAULT_SETTINGS, loadState, newStreamId, saveState, type AppSettings } from './store';
 import type { SyncPlan } from './sync';
 import { setTwitchTokenProvider } from './twitch-hls';
@@ -232,6 +233,7 @@ app.innerHTML = `
       </label>
 
       <footer class="modal-foot">
+        <span class="version-badge" id="app-version" translate="no"></span>
         <button type="button" class="btn" data-close data-i18n="close"></button>
       </footer>
     </form>
@@ -569,7 +571,6 @@ function applyLanguage(): void {
   chat.refreshLabels();
   updateLayout();
   engine.relocalize();
-  renderStatus(engine.getViews(), engine.getPlan());
   syncSettingsForm();
   localizeFatal();
 }
@@ -960,6 +961,9 @@ function syncTwitchStreams(): void {
 }
 
 applyLanguage();
+
+const versionBadge = document.getElementById('app-version');
+if (versionBadge) versionBadge.textContent = `v${APP_VERSION}`;
 
 for (const config of streams) engine.add(config);
 engine.start();
